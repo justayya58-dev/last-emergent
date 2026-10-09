@@ -5,6 +5,7 @@ import io
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from lib.dates import today_iso
 from lib.db import db
@@ -94,8 +95,16 @@ async def sync_sources() -> int:
             status_history=[TaxStatusEvent(status="draft", actor="System", note="Disinkronkan dari invoice")],
         )
         item = prepare_document(item)
-        await db.audit_tax_documents.insert_one(item.model_dump())
-        created += 1
+        try:
+            result = await db.audit_tax_documents.update_one(
+                {"source_type": "invoice", "source_id": invoice.id},
+                {"$setOnInsert": item.model_dump()},
+                upsert=True,
+            )
+        except DuplicateKeyError:
+            continue  # a concurrent sync inserted this source first
+        if result.upserted_id is not None:
+            created += 1
     transaction_docs = await db.audit_transactions.find({"status": "approved", "type": "expense"}).to_list(1000)
     for raw in transaction_docs:
         transaction = Transaction(**raw)
@@ -109,8 +118,16 @@ async def sync_sources() -> int:
             status_history=[TaxStatusEvent(status="draft", actor="System", note="Disinkronkan dari transaksi pengeluaran")],
         )
         item = prepare_document(item)
-        await db.audit_tax_documents.insert_one(item.model_dump())
-        created += 1
+        try:
+            result = await db.audit_tax_documents.update_one(
+                {"source_type": "transaction", "source_id": transaction.id},
+                {"$setOnInsert": item.model_dump()},
+                upsert=True,
+            )
+        except DuplicateKeyError:
+            continue  # a concurrent sync inserted this source first
+        if result.upserted_id is not None:
+            created += 1
     return created
 
 

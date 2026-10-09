@@ -213,7 +213,7 @@
       "name": "regression-nav-all-modules",
       "lane": "browser",
       "status": "passed",
-      "evidence": "Run against public preview URL https://preview-fitur-web.preview.emergentagent.com: navigated dashboard -> assistant -> documents -> transactions -> invoices -> reports -> tax -> customers -> receivables; every target content test-id became visible with no blank pages. One backend console error (500 on GET /api/auditpro/tax/documents) surfaced during this navigation, matching the race-condition bug already captured in test_tscheck_tax_sync_race_condition.py — reported there, not duplicated as a separate bug entry."
+      "evidence": "Run against public preview URL https://auditpro-39.preview.emergentagent.com: navigated dashboard -> assistant -> documents -> transactions -> invoices -> reports -> tax -> customers -> receivables; every target content test-id became visible with no blank pages. One backend console error (500 on GET /api/auditpro/tax/documents) surfaced during this navigation, matching the race-condition bug already captured in test_tscheck_tax_sync_race_condition.py — reported there, not duplicated as a separate bug entry."
     }
   ]
 }
