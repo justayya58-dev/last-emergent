@@ -1,0 +1,79 @@
+{
+  "iteration": 7,
+  "summary": "Retest of the GET /api/auditpro/invoices ledger bug fix (sort tiebreaker [('issue_date',-1),('_id',-1)] + cap raised 100->500). Reran the two previously-failing backend tests (test_tscheck_invoice_finalize_field.py, test_tscheck_invoice_creation.py) -- both now pass. Reran the full pre-existing backend suite (46 tests) for regression: only the 3 known-flaky live-Gemini OCR tests failed (out of scope per spec_deviations, confirmed non-deterministic by a focused rerun where 1 of 3 flipped to pass). Reran all 7 persisted Fase-1/ledger-adjacent browser checks by name -- all pass. GET /api/auditpro/invoices now returns 203 rows (cap confirmed raised above 100), consistent with the fix.",
+  "passed": 9,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "flaky_dependency",
+      "note": "tests/test_tscheck_document_extraction.py, test_tscheck_document_validation.py, test_tscheck_duplicate_detection.py intermittently fail with 502 'Gemini tidak dapat memproses dokumen ini' on the live Gemini OCR call (full-suite run: all 3 failed; focused rerun: 1 of 3 passed). Matches spec_deviations ('Document OCR ... can intermittently 502 on first attempt — out of scope for this retest'). No application code issue identified; purely upstream LLM latency/availability."
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Newly created invoice reliably appears in the ledger",
+      "name": "tests/test_tscheck_invoice_finalize_field.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auditpro/invoices finalize=false -> 200 status=draft; finalize=true -> 200 status=pending. Both now found in GET /api/auditpro/invoices (previously failed on the 100-row cap/no-tiebreaker bug; now passes with sort [('issue_date',-1),('_id',-1)] and cap=500). 2 passed."
+    },
+    {
+      "criterion": "Newly created invoice reliably appears in the ledger",
+      "name": "tests/test_tscheck_invoice_creation.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "test_invoice_database_and_draft_creation now passes: invoice created via POST is present in GET /api/auditpro/invoices list immediately after creation. 2 passed."
+    },
+    {
+      "criterion": "Edited draft still reflected in ledger with new total",
+      "name": "invoice-edit-draft-recomputes-total",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Saved a draft, clicked invoice-edit-button, changed qty/price, clicked invoice-update-button -> invoice-saved-number unchanged, invoice-status-draft still shown with recomputed total after update. Re-run (reran-persisted) passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (status transitions)",
+      "name": "invoice-finalize-send-paid-workflow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "draft -> invoice-finalize-button -> pending ('Final') -> invoice-send-button -> sent ('Terkirim') -> invoice-paid-button -> paid ('Lunas'). All 4 badge transitions visible. Re-run passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (overdue from pending/sent, 409s)",
+      "name": "invoice-mark-overdue-from-pending",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Saved invoice via invoice-save-final-button (pending) -> invoice-overdue-button -> invoice-status-overdue ('Jatuh tempo') badge visible. Re-run passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (draft vs final save, ledger visibility)",
+      "name": "invoice-save-draft-vs-final",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Draft save -> invoice-status-draft badge with auto number; final save -> invoice-status-pending ('Final') badge with distinct number. Re-run passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (full studio create+pay incl. ledger/Database tab)",
+      "name": "invoice-studio-create-and-pay",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Invoice live preview renders correctly; invoice reaches paid state end-to-end in the studio. Re-run passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (PDF/Excel export)",
+      "name": "invoice-export-pdf-excel",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Export actions succeed (200) from the invoice studio; screenshot invoice-exported captured. Re-run passed."
+    },
+    {
+      "criterion": "No regression on Fase 1 invoice workflow (dashboard recent invoices / receivables, same tiebreaker fix)",
+      "name": "dashboard-overview-renders",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Dashboard renders recent invoices and summary figures correctly with the same ('_id',-1) tiebreaker fix applied to the recent-invoices query. Re-run passed."
+    }
+  ]
+}

@@ -1,32 +1,57 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, Download, FileSpreadsheet, Landmark, ReceiptText, WalletCards } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDownRight, ArrowUpRight, Download, FileSpreadsheet, FileText, History, Landmark, ReceiptText, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiDownload, apiGet } from "@/lib/api";
-import type { ReportSummary } from "@/types/finance";
+import type { ExportLog, ReportSummary } from "@/types/finance";
 
 const formatIDR = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 const emptyReport: ReportSummary = { period_start: "—", period_end: "—", sales_total: 0, expense_total: 0, net_profit: 0, receivables: 0, tax_collected: 0, tax_paid: 0, approved_count: 0, pending_count: 0, categories: [] };
 
+const triggerDownload = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url; anchor.download = filename; anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+const formatBadge: Record<ExportLog["export_format"], string> = { pdf: "border-red-400/20 bg-red-400/10 text-red-300", xlsx: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300", csv: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300" };
+
 export default function ReportsView() {
+  const queryClient = useQueryClient();
   const reportQuery = useQuery({ queryKey: ["reports"], queryFn: () => apiGet<ReportSummary>("/auditpro/reports/summary"), retry: false });
+  const historyQuery = useQuery({ queryKey: ["export-history"], queryFn: () => apiGet<ExportLog[]>("/auditpro/exports/history"), retry: false });
   const report = reportQuery.data ?? emptyReport;
-  const exportMutation = useMutation({
-    mutationFn: () => apiDownload("/auditpro/reports/export.csv"),
-    onSuccess: (blob) => {
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = `auditpro-report-${report.period_start}-${report.period_end}.csv`; anchor.click();
-      URL.revokeObjectURL(url);
-      toast.success("Laporan CSV berhasil diexport");
+  const history = historyQuery.data ?? [];
+  const periodReady = report.period_start !== "—";
+  const periodQuery = periodReady ? `?start=${report.period_start}&end=${report.period_end}` : "";
+
+  const downloadMutation = useMutation({
+    mutationFn: async ({ path, filename }: { path: string; filename: string; label: string }) => {
+      const blob = await apiDownload(path);
+      return { blob, filename };
     },
-    onError: () => toast.error("Laporan belum dapat diexport"),
+    onSuccess: ({ blob, filename }, variables) => {
+      triggerDownload(blob, filename);
+      queryClient.invalidateQueries({ queryKey: ["export-history"] });
+      toast.success(`${variables.label} berhasil diexport`);
+    },
+    onError: (_error, variables) => toast.error(`${variables.label} belum dapat diexport`),
   });
-  return <div className="animate-rise-in space-y-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p data-testid="reports-eyebrow" className="text-[11px] font-semibold uppercase tracking-[.2em] text-emerald-400">FINANCIAL REPORTING · 05</p><h1 data-testid="reports-title" className="mt-2 font-heading text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Laporan otomatis</h1><p data-testid="reports-subtitle" className="mt-2 text-sm text-slate-500">Ringkasan transaksi yang sudah disetujui, langsung dari unified ledger.</p></div><Button data-testid="report-export-csv-button" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending} className="w-fit gap-2 bg-emerald-400 text-xs font-semibold text-[#03251b] hover:bg-emerald-300"><Download size={15} /> {exportMutation.isPending ? "Menyiapkan..." : "Export CSV"}</Button></div>
+
+  const pending = downloadMutation.isPending ? downloadMutation.variables?.label : null;
+
+  return <div className="animate-rise-in space-y-6"><div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end"><div><p data-testid="reports-eyebrow" className="text-[11px] font-semibold uppercase tracking-[.2em] text-emerald-400">FINANCIAL REPORTING · 05</p><h1 data-testid="reports-title" className="mt-2 font-heading text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Laporan otomatis</h1><p data-testid="reports-subtitle" className="mt-2 text-sm text-slate-500">Ringkasan transaksi yang sudah disetujui, langsung dari unified ledger.</p></div>
+    <div data-testid="report-export-toolbar" className="flex flex-wrap gap-2">
+      <Button data-testid="report-business-pdf-button" onClick={() => downloadMutation.mutate({ path: `/auditpro/reports/business-export.pdf${periodQuery}`, filename: `laporan-bisnis-${report.period_start}-${report.period_end}.pdf`, label: "Laporan bisnis PDF" })} disabled={!periodReady || downloadMutation.isPending} className="w-fit gap-2 bg-rose-400 text-xs font-semibold text-[#2a0b12] hover:bg-rose-300"><FileText size={15} /> {pending === "Laporan bisnis PDF" ? "Menyiapkan..." : "Laporan Bisnis PDF"}</Button>
+      <Button data-testid="report-business-excel-button" onClick={() => downloadMutation.mutate({ path: `/auditpro/reports/business-export.xlsx${periodQuery}`, filename: `laporan-bisnis-${report.period_start}-${report.period_end}.xlsx`, label: "Laporan bisnis Excel" })} disabled={!periodReady || downloadMutation.isPending} className="w-fit gap-2 bg-emerald-400 text-xs font-semibold text-[#03251b] hover:bg-emerald-300"><FileSpreadsheet size={15} /> {pending === "Laporan bisnis Excel" ? "Menyiapkan..." : "Laporan Bisnis Excel"}</Button>
+      <Button data-testid="report-export-csv-button" onClick={() => downloadMutation.mutate({ path: `/auditpro/reports/export.csv${periodQuery}`, filename: `auditpro-report-${report.period_start}-${report.period_end}.csv`, label: "Rekap transaksi CSV" })} disabled={!periodReady || downloadMutation.isPending} variant="outline" className="w-fit gap-2 border-white/10 bg-transparent text-xs font-semibold text-slate-200 hover:bg-white/5"><Download size={15} /> {pending === "Rekap transaksi CSV" ? "Menyiapkan..." : "Export CSV"}</Button>
+    </div></div>
     <div data-testid="report-period" className="flex items-center gap-2 text-xs text-slate-500"><FileSpreadsheet size={14} className="text-cyan-300" /><span data-testid="report-period-value">Periode {report.period_start} — {report.period_end}</span><span data-testid="report-approved-count" className="ml-2 rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-300">{report.approved_count} disetujui</span><span data-testid="report-pending-count" className="rounded-md bg-amber-400/10 px-2 py-1 text-[10px] text-amber-300">{report.pending_count} menunggu</span></div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Card data-testid="report-sales-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardContent className="p-5"><div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500"><span>Total penjualan</span><ArrowUpRight size={16} className="text-emerald-300" /></div><p data-testid="report-sales-value" className="mt-4 font-heading text-xl font-bold text-emerald-300">{formatIDR(report.sales_total)}</p></CardContent></Card><Card data-testid="report-expense-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardContent className="p-5"><div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500"><span>Pengeluaran</span><ArrowDownRight size={16} className="text-amber-300" /></div><p data-testid="report-expense-value" className="mt-4 font-heading text-xl font-bold text-amber-300">{formatIDR(report.expense_total)}</p></CardContent></Card><Card data-testid="report-profit-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardContent className="p-5"><div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500"><span>Laba bersih</span><Landmark size={16} className="text-cyan-300" /></div><p data-testid="report-profit-value" className="mt-4 font-heading text-xl font-bold text-cyan-300">{formatIDR(report.net_profit)}</p></CardContent></Card><Card data-testid="report-receivables-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardContent className="p-5"><div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500"><span>Piutang</span><WalletCards size={16} className="text-violet-300" /></div><p data-testid="report-receivables-value" className="mt-4 font-heading text-xl font-bold text-violet-300">{formatIDR(report.receivables)}</p></CardContent></Card></div>
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_360px]"><Card data-testid="report-category-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardHeader className="border-b border-white/[0.06] px-5 py-4"><CardTitle data-testid="report-category-title" className="font-heading text-base font-bold text-white">Rekap per kategori</CardTitle></CardHeader><CardContent className="p-0"><div className="overflow-x-auto"><table data-testid="report-category-table" className="w-full text-left"><thead className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-600"><tr><th className="px-5 py-3">Kategori</th><th className="px-3 py-3">Pemasukan</th><th className="px-5 py-3 text-right">Pengeluaran</th></tr></thead><tbody>{report.categories.length ? report.categories.map((row) => <tr data-testid={`report-category-${row.category.toLowerCase().replaceAll(" ", "-")}`} key={row.category} className="border-b border-white/[0.04] last:border-0"><td className="px-5 py-4 text-xs font-semibold text-slate-300">{row.category}</td><td className="px-3 py-4 text-xs text-emerald-300">{formatIDR(row.income)}</td><td className="px-5 py-4 text-right text-xs text-amber-300">{formatIDR(row.expense)}</td></tr>) : <tr><td data-testid="report-category-empty" colSpan={3} className="px-5 py-10 text-center text-xs text-slate-600">Belum ada transaksi disetujui pada periode ini.</td></tr>}</tbody></table></div></CardContent></Card><Card data-testid="report-tax-card" className="h-fit border-white/[0.07] bg-[#101b2a] shadow-none"><CardHeader className="px-5 pb-2 pt-5"><div className="flex items-center gap-2"><ReceiptText size={16} className="text-emerald-300" /><CardTitle data-testid="report-tax-title" className="font-heading text-base font-bold text-white">Ringkasan pajak</CardTitle></div></CardHeader><CardContent className="space-y-3 p-5"><div data-testid="report-tax-collected" className="flex items-center justify-between rounded-lg bg-white/[0.03] p-3"><span className="text-xs text-slate-500">Pajak keluaran</span><span className="text-xs font-semibold text-slate-200">{formatIDR(report.tax_collected)}</span></div><div data-testid="report-tax-paid" className="flex items-center justify-between rounded-lg bg-white/[0.03] p-3"><span className="text-xs text-slate-500">Pajak masukan</span><span className="text-xs font-semibold text-slate-200">{formatIDR(report.tax_paid)}</span></div><div data-testid="report-tax-net" className="flex items-center justify-between rounded-lg border border-emerald-400/10 bg-emerald-400/[0.05] p-3"><span className="text-xs text-emerald-200">Estimasi net</span><span className="text-xs font-bold text-emerald-300">{formatIDR(report.tax_collected - report.tax_paid)}</span></div><p data-testid="report-tax-note" className="text-[10px] leading-relaxed text-slate-600">Ringkasan awal berdasarkan transaksi disetujui. Modul kepatuhan pajak lengkap tersedia pada Tahap 3.</p></CardContent></Card></div>
+    <Card data-testid="export-history-card" className="border-white/[0.07] bg-[#111827]/80 shadow-none"><CardHeader className="flex-row items-center justify-between space-y-0 border-b border-white/[0.06] px-5 py-4"><div className="flex items-center gap-2"><History size={16} className="text-cyan-300" /><CardTitle data-testid="export-history-title" className="font-heading text-base font-bold text-white">Riwayat export</CardTitle></div><span data-testid="export-history-count" className="text-xs text-slate-500">{history.length} aktivitas</span></CardHeader><CardContent className="p-0"><div className="overflow-x-auto"><table data-testid="export-history-table" className="w-full min-w-[640px] text-left"><thead className="border-b border-white/[0.06] text-[10px] uppercase tracking-wider text-slate-600"><tr><th className="px-5 py-3">Dokumen</th><th className="px-3 py-3">Format</th><th className="px-3 py-3">Periode</th><th className="px-3 py-3">Baris</th><th className="px-5 py-3 text-right">Waktu</th></tr></thead><tbody>{history.length ? history.map((log) => <tr data-testid={`export-history-row-${log.id}`} key={log.id} className="border-b border-white/[0.04] last:border-0"><td className="px-5 py-3 text-xs font-semibold text-slate-200">{log.title}</td><td className="px-3 py-3"><span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${formatBadge[log.export_format]}`}>{log.export_format}</span></td><td className="px-3 py-3 text-xs text-slate-500">{log.period_start && log.period_end ? `${log.period_start} — ${log.period_end}` : log.scope || "—"}</td><td className="px-3 py-3 text-xs text-slate-400">{log.row_count}</td><td className="px-5 py-3 text-right text-[11px] text-slate-500">{new Date(log.created_at).toLocaleString("id-ID")}</td></tr>) : <tr><td data-testid="export-history-empty" colSpan={5} className="px-5 py-10 text-center text-xs text-slate-600">Belum ada aktivitas export.</td></tr>}</tbody></table></div></CardContent></Card>
   </div>;
 }

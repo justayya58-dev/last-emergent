@@ -42,6 +42,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "assistant_messages": [IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)], name="assistant_message_thread")],
     "assistant_proposals": [IndexModel([("id", ASCENDING)], name="assistant_proposal_id", unique=True), IndexModel([("session_id", ASCENDING), ("created_at", DESCENDING)], name="assistant_proposal_thread")],
     "assistant_audit": [IndexModel([("session_id", ASCENDING), ("timestamp", DESCENDING)], name="assistant_audit_thread")],
+    "audit_exports": [IndexModel([("created_at", DESCENDING)], name="export_created_desc")],
 }
 
 

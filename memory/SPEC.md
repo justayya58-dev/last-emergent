@@ -12,6 +12,7 @@ AuditPro AI is a dark-first AI Business Document & Financial Management Platform
 - Dashboard and automatic reports calculated from approved transactions, including sales, expenses, net profit, receivables, tax summary, and CSV export.
 - Tax Compliance workspace with 0%/11%/12% profiles, automatic source reconciliation, NPWP/faktur/date/DPP/PPN validation, completeness scoring, Draft → Review → Ready → Reported/Needs Correction workflow, tax-period dashboard, CSV/Excel, and e-Faktur preview export.
 - Grounded Financial Assistant powered by Gemini 3.8 Flash with SSE token streaming, persisted workspace sessions, quick prompts, business-data context, and audited proposal approval.
+- Advanced export & document enhancement: professional reportlab invoice PDFs (logo, branding, bill-to/pay-to, itemized table, subtotal/tax/total, terbilang) and a one-file comprehensive Business Report in PDF (multi-section) and Excel (multi-sheet: Ringkasan Finansial, Invoice, Rekap Transaksi, Sales Report, Laba Rugi, Laporan Pajak) with professional formatting (report headers, Rupiah number format, auto totals, autofilter, frozen header, column sizing). Every export (invoice PDF/XLSX, tax CSV/XLSX/e-Faktur, transaction CSV, business report PDF/XLSX) is recorded to an audit_exports log surfaced as "Riwayat export" on the Laporan page.
 
 ## Data model
 - `AuditDocument`: id, file metadata, workflow status, linked transaction id, confidence, uploaded timestamp, and extracted vendor/invoice/date/totals/category.
@@ -27,11 +28,12 @@ AuditPro AI is a dark-first AI Business Document & Financial Management Platform
 - `AssistantProposal`: allowlisted pending draft invoice/report action requiring explicit confirmation, with decision and result identifiers.
 - `AssistantAuditEvent`: immutable record of messages, proposals, confirmations, and cancellations.
 - `AssistantDraftReport`: confirmed report snapshot that never mutates source transactions.
+- `ExportLog` (collection audit_exports): id, export_type (invoice/transactions/report/tax/efaktur/business_report), export_format (pdf/xlsx/csv), title, scope, period_start/end, row_count, actor, created_at — one immutable row per export activity.
 
 ## Key flow
 Upload/input transaksi → Gemini extraction or manual draft → review → approve/reject → unified database → invoice recap → dynamic dashboard → report/export CSV.
 
-Invoice flow: choose one of three templates → select customer/product → live quantity/price/tax/terbilang calculation → save with automatic number → export PDF/Excel → mark sent → mark paid; a paid invoice automatically creates an approved income transaction.
+Invoice flow: choose one of three templates → select customer/product → live quantity/price/tax/terbilang calculation → **Simpan Draft** (status draft, still editable via PUT /invoices/{id}) or **Simpan Invoice** (finalize, status `pending` = "Final · menunggu kirim") → export PDF/Excel → **Finalkan** a draft (draft→pending) → **Kirim** (draft/pending→sent) → **Tandai Lunas** (sent/overdue→paid) or **Tandai Jatuh Tempo** (sent/pending→overdue); sent invoices past due_date auto-become overdue; a paid invoice automatically creates an approved income transaction. All invoice states feed the dashboard, sales report, and receivables (pending/sent/overdue = outstanding) and leave an audit trail via the auto-created transaction.
 
 Tax flow: sync sent/paid/overdue invoices and approved expenses → complete NPWP, tax invoice number, date, DPP, and rate → automatic PPN validation → review → ready for e-Faktur → reported or returned for correction → export tax-period CSV/Excel/e-Faktur preview.
 

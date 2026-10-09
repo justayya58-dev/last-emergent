@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 
 from lib.dates import today_iso
 from lib.db import db
+from lib.exports import log_export
 from models.auditpro import (
     Customer,
     Invoice,
@@ -250,6 +251,7 @@ async def export_tax_csv(period: str | None = Query(default=None)):
     writer.writerow(["Arah", "Sumber", "Referensi", "Pihak", "NPWP", "Nomor Faktur", "Tanggal", "Masa", "DPP", "Tarif", "PPN", "Status", "Kelengkapan"])
     for item in documents:
         writer.writerow([item.direction, item.source_type, item.source_reference, item.counterparty, item.npwp, item.tax_invoice_number, item.document_date, item.tax_period, item.dpp, item.tax_rate, item.vat, item.status, item.completeness_score])
+    await log_export("tax", "csv", f"Laporan Pajak {selected_period} (CSV)", scope=selected_period, period_start=f"{selected_period}-01", period_end=f"{selected_period}-01", row_count=len(documents))
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="auditpro-tax-{selected_period}.csv"'})
 
 
@@ -259,6 +261,7 @@ async def export_tax_xlsx(period: str | None = Query(default=None)):
     documents = await get_period_documents(selected_period)
     summary = await make_summary(selected_period)
     payload = build_tax_xlsx(summary, documents)
+    await log_export("tax", "xlsx", f"Laporan Pajak {selected_period} (Excel)", scope=selected_period, period_start=f"{selected_period}-01", period_end=f"{selected_period}-01", row_count=len(documents))
     return StreamingResponse(io.BytesIO(payload), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="auditpro-tax-{selected_period}.xlsx"'})
 
 
@@ -271,4 +274,5 @@ async def export_efaktur_preview(period: str | None = Query(default=None)):
     writer.writerow(["FK", "KD_JENIS_TRANSAKSI", "FG_PENGGANTI", "NOMOR_FAKTUR", "MASA_PAJAK", "TAHUN_PAJAK", "TANGGAL_FAKTUR", "NPWP", "NAMA", "JUMLAH_DPP", "JUMLAH_PPN"])
     for item in documents:
         writer.writerow(["FK", "01", "0", item.tax_invoice_number, int(item.tax_period[5:7]), int(item.tax_period[:4]), item.document_date, item.npwp, item.counterparty, item.dpp, item.vat])
+    await log_export("efaktur", "csv", f"Preview e-Faktur {selected_period}", scope=selected_period, period_start=f"{selected_period}-01", period_end=f"{selected_period}-01", row_count=len(documents))
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="efaktur-preview-{selected_period}.csv"'})

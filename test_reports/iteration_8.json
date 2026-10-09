@@ -1,0 +1,86 @@
+{
+  "iteration": 8,
+  "summary": "Retest for NEW FEATURE: Advanced Export & Document Enhancement (business report PDF/XLSX, professional invoice PDF, export audit history + Laporan UI). Added 2 new backend test files (8 tests) and 1 new browser check; re-ran all 7 pre-existing browser checks by name (no regressions) plus 1 through the public preview URL; re-ran the full backend suite for regression (51 passed, only the 3 known out-of-scope live-Gemini OCR tests failed, matching spec_deviations). All new-feature criteria pass.",
+  "passed": 10,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "flaky_dependency",
+      "note": "Full-suite regression rerun: tests/test_tscheck_document_extraction.py, test_tscheck_document_validation.py, test_tscheck_duplicate_detection.py failed again with 502 'Gemini tidak dapat memproses dokumen ini' on the live Gemini OCR call. Matches spec_deviations ('Document OCR ... may intermittently 502 on first attempt — out of scope for this retest'). No application code issue identified; not part of this feature's criteria."
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Business Report PDF export",
+      "name": "tests/test_tscheck_business_export_report.py::test_business_export_pdf_returns_valid_pdf",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auditpro/reports/business-export.pdf -> 200, content-type application/pdf, body starts with %PDF, size > 2000 bytes."
+    },
+    {
+      "criterion": "Period scoping for business export",
+      "name": "tests/test_tscheck_business_export_report.py::test_business_export_pdf_respects_period + test_business_export_invalid_period_returns_422",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET .../business-export.pdf?start=2026-10-01&end=2026-10-10 -> 200 valid PDF. start>end (2026-10-10..2026-10-01) -> 422; bad date format 'not-a-date' -> 422."
+    },
+    {
+      "criterion": "Business Report Excel export (professional, multi-sheet)",
+      "name": "tests/test_tscheck_business_export_report.py::test_business_export_xlsx_has_six_named_sheets_with_rupiah_format",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auditpro/reports/business-export.xlsx -> 200, spreadsheetml content-type, body starts with PK; openpyxl.load_workbook sheetnames == ['Ringkasan Finansial','Invoice','Rekap Transaksi','Sales Report','Laba Rugi','Laporan Pajak']; 'Ringkasan Finansial' has auto_filter set; at least one cell uses '\"Rp\" #,##0' number format."
+    },
+    {
+      "criterion": "Professional invoice PDF (API: valid id 200, invalid id 404)",
+      "name": "tests/test_tscheck_invoice_export.py (pre-existing, re-run)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auditpro/invoices/{id}/export.pdf -> 200 %PDF for a freshly created invoice; bogus id -> 404 for both .pdf and .xlsx. 3 passed."
+    },
+    {
+      "criterion": "Export activity recorded to audit trail (business report, invoice, tax csv)",
+      "name": "tests/test_tscheck_export_audit_history.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /auditpro/exports/history -> 200, <=50 rows, newest-first by created_at. After GET business-export.pdf a new row with export_type=business_report, export_format=pdf appears. After GET invoices/{id}/export.pdf a new export_type=invoice/export_format=pdf row appears. After GET tax/export.csv a new export_format=csv row appears. 4 passed."
+    },
+    {
+      "criterion": "No regression on existing exports and reports",
+      "name": "tests/ (full backend suite regression)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "51 passed / 54 total; the 3 failures are the known out-of-scope live-Gemini OCR 502s (document_extraction, document_validation, duplicate_detection) per spec_deviations, unrelated to export/report endpoints. reports/summary, reports/export.csv, invoices export.xlsx, tax export.csv/.xlsx/efaktur-preview.csv all pass within the relevant pre-existing test files."
+    },
+    {
+      "criterion": "Business Report PDF/Excel buttons + export-history-card refresh on Laporan page",
+      "name": "reports-business-export-and-history",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /reports: clicked report-business-pdf-button -> download laporan-bisnis-<start>-<end>.pdf; export-history-count incremented; clicked report-business-excel-button -> download laporan-bisnis-<start>-<end>.xlsx; export-history-count incremented again; export-history-table visible with new rows. Passed on localhost and again via the public preview URL (auditpro-39.preview.emergentagent.com)."
+    },
+    {
+      "criterion": "No regression: existing Reports CSV export + figures (report-export-csv-button, report-period, summary cards)",
+      "name": "reports-summary-and-export",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): reports-title/sales/expense/profit/receivables/tax-collected all visible; report-export-csv-button download matches /\\.csv$/."
+    },
+    {
+      "criterion": "No regression: invoice PDF/Excel export from Invoice Studio (now professional reportlab PDF)",
+      "name": "invoice-export-pdf-excel",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): export actions succeed (200) from the invoice studio; screenshot invoice-exported captured."
+    },
+    {
+      "criterion": "No regression: dashboard figures unchanged",
+      "name": "dashboard-overview-renders",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): dashboard renders recent invoices and summary figures correctly."
+    }
+  ]
+}

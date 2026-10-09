@@ -18,10 +18,21 @@ export interface InvoiceCreate {
   template: InvoiceTemplate;
   notes: string;
   tax_rate: number;
+  finalize: boolean;
+}
+
+export interface InvoiceUpdate {
+  customer: string;
+  customer_id: string | null;
+  due_date: string;
+  items: InvoiceItem[];
+  template: InvoiceTemplate;
+  notes: string;
+  tax_rate: number;
 }
 
 export interface InvoiceActionRequest {
-  action: "send" | "mark_paid" | "mark_overdue";
+  action: "finalize" | "send" | "mark_paid" | "mark_overdue";
 }
 
 export interface Invoice {

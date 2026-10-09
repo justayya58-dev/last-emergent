@@ -3,6 +3,7 @@ import csv
 import base64
 from datetime import date, datetime, timezone
 import io
+import logging
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -11,6 +12,7 @@ from pymongo import ReturnDocument
 
 from lib.dates import today_iso
 from lib.db import db
+from lib.exports import log_export
 from models.auditpro import (
     AuditDocument,
     AuditEvent,
@@ -19,21 +21,25 @@ from models.auditpro import (
     Customer,
     CustomerCreate,
     DashboardSummary,
+    ExportLog,
     ExtractionData,
     Invoice,
     InvoiceActionRequest,
     InvoiceCreate,
+    InvoiceUpdate,
     InvoiceItem,
     Product,
     ProductCreate,
     ReportCategory,
     ReportSummary,
+    TaxDocument,
     Transaction,
     TransactionActionRequest,
     TransactionCreate,
 )
 from services.ocr import OCR_MODEL, OcrExtractionError, extract_invoice
 from services.invoice_exports import amount_words, build_invoice_pdf, build_invoice_xlsx
+from services.pro_exports import build_business_report_pdf, build_business_report_xlsx, build_invoice_pdf_pro
 from routers.tax import router as tax_router
 from routers.assistant import router as assistant_router
 
@@ -249,7 +255,7 @@ async def report_summary(period_start: str, period_end: str) -> ReportSummary:
 async def get_dashboard() -> DashboardSummary:
     await ensure_demo_invoices()
     await ensure_demo_transactions()
-    invoice_docs = await db.audit_invoices.find().sort("issue_date", -1).to_list(4)
+    invoice_docs = await db.audit_invoices.find().sort([("issue_date", -1), ("_id", -1)]).to_list(4)
     invoices = [Invoice(**invoice) for invoice in invoice_docs]
     today = date.fromisoformat(today_iso())
     current_start = today.replace(day=1).isoformat()
@@ -439,6 +445,12 @@ def report_period(start: str | None, end: str | None) -> tuple[str, str]:
     return period_start, period_end
 
 
+@router.get("/exports/history", response_model=list[ExportLog])
+async def get_export_history() -> list[ExportLog]:
+    docs = await db.audit_exports.find().sort([("created_at", -1), ("_id", -1)]).to_list(50)
+    return [ExportLog(**doc) for doc in docs]
+
+
 @router.get("/reports/summary", response_model=ReportSummary)
 async def get_report_summary(start: str | None = Query(default=None), end: str | None = Query(default=None)) -> ReportSummary:
     period_start, period_end = report_period(start, end)
@@ -457,6 +469,7 @@ async def export_report_csv(start: str | None = Query(default=None), end: str | 
         item = Transaction(**doc)
         writer.writerow([item.transaction_date, item.type, item.reference_number, item.counterparty, item.category, item.subtotal, item.tax, item.total, item.status, item.source])
     filename = f"auditpro-report-{period_start}-{period_end}.csv"
+    await log_export("transactions", "csv", "Rekap Transaksi (CSV)", period_start=period_start, period_end=period_end, row_count=len(docs))
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv; charset=utf-8",
@@ -464,12 +477,49 @@ async def export_report_csv(start: str | None = Query(default=None), end: str | 
     )
 
 
+async def gather_business_report(period_start: str, period_end: str) -> dict:
+    await ensure_master_data()
+    await ensure_demo_transactions()
+    await ensure_demo_invoices()
+    company = CompanyProfile(**(await db.audit_company.find_one({"id": "company-profile"})))
+    report = await report_summary(period_start, period_end)
+    invoice_docs = await db.audit_invoices.find({"issue_date": {"$gte": period_start, "$lte": period_end}}).sort([("issue_date", -1), ("_id", -1)]).to_list(1000)
+    invoices = [Invoice(**doc) for doc in invoice_docs]
+    tx_docs = await db.audit_transactions.find({"transaction_date": {"$gte": period_start, "$lte": period_end}}).sort("transaction_date", -1).to_list(2000)
+    transactions = [Transaction(**doc) for doc in tx_docs]
+    tax_docs = await db.audit_tax_documents.find({"document_date": {"$gte": period_start, "$lte": period_end}}).sort("document_date", -1).to_list(2000)
+    tax_documents = [TaxDocument(**doc) for doc in tax_docs]
+    generated_at = now_iso()
+    return {"company": company, "period_start": period_start, "period_end": period_end, "invoices": invoices, "transactions": transactions, "report": report, "tax_documents": tax_documents, "generated_at": generated_at}
+
+
+@router.get("/reports/business-export.pdf")
+async def export_business_report_pdf(start: str | None = Query(default=None), end: str | None = Query(default=None)):
+    period_start, period_end = report_period(start, end)
+    data = await gather_business_report(period_start, period_end)
+    payload = build_business_report_pdf(data["company"], period_start, period_end, data["invoices"], data["transactions"], data["report"], data["tax_documents"], data["generated_at"])
+    rows = len(data["invoices"]) + len(data["transactions"]) + len(data["tax_documents"])
+    await log_export("business_report", "pdf", "Laporan Bisnis Lengkap (PDF)", period_start=period_start, period_end=period_end, row_count=rows)
+    filename = f"laporan-bisnis-{period_start}-{period_end}.pdf"
+    return StreamingResponse(io.BytesIO(payload), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.get("/reports/business-export.xlsx")
+async def export_business_report_xlsx(start: str | None = Query(default=None), end: str | None = Query(default=None)):
+    period_start, period_end = report_period(start, end)
+    data = await gather_business_report(period_start, period_end)
+    payload = build_business_report_xlsx(data["company"], period_start, period_end, data["invoices"], data["transactions"], data["report"], data["tax_documents"], data["generated_at"])
+    rows = len(data["invoices"]) + len(data["transactions"]) + len(data["tax_documents"])
+    await log_export("business_report", "xlsx", "Laporan Bisnis Lengkap (Excel)", period_start=period_start, period_end=period_end, row_count=rows)
+    filename = f"laporan-bisnis-{period_start}-{period_end}.xlsx"
+    return StreamingResponse(io.BytesIO(payload), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 @router.get("/invoices", response_model=list[Invoice])
 async def get_invoices() -> list[Invoice]:
     await ensure_demo_invoices()
-    await db.audit_invoices.update_many({"status": "pending"}, {"$set": {"status": "sent"}})
     await db.audit_invoices.update_many({"status": "sent", "due_date": {"$lt": today_iso()}}, {"$set": {"status": "overdue"}})
-    invoices = await db.audit_invoices.find().sort("issue_date", -1).to_list(100)
+    invoices = await db.audit_invoices.find().sort([("issue_date", -1), ("_id", -1)]).to_list(500)
     return [Invoice(**invoice) for invoice in invoices]
 
 
@@ -504,11 +554,47 @@ async def create_invoice(input: InvoiceCreate) -> Invoice:
         amount_words=amount_words(total),
         template=input.template,
         notes=input.notes,
-        status="draft",
+        status="pending" if input.finalize else "draft",
         items=normalized_items,
     )
     await db.audit_invoices.insert_one(invoice.model_dump())
     return invoice
+
+
+@router.put("/invoices/{invoice_id}", response_model=Invoice)
+async def update_invoice(invoice_id: str, input: InvoiceUpdate) -> Invoice:
+    await ensure_master_data()
+    doc = await db.audit_invoices.find_one({"id": invoice_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Invoice tidak ditemukan")
+    invoice = Invoice(**doc)
+    if invoice.status != "draft":
+        raise HTTPException(status_code=409, detail="Hanya invoice berstatus draft yang dapat diubah")
+    try:
+        due_date = date.fromisoformat(input.due_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Format jatuh tempo harus YYYY-MM-DD") from exc
+    if due_date < date.fromisoformat(invoice.issue_date):
+        raise HTTPException(status_code=422, detail="Jatuh tempo tidak boleh sebelum tanggal invoice")
+    normalized_items = [InvoiceItem(product_id=item.product_id, description=item.description, unit=item.unit, quantity=item.quantity, price=item.price, total=round(item.quantity * item.price, 2)) for item in input.items]
+    subtotal = sum(item.total for item in normalized_items)
+    tax = round(subtotal * input.tax_rate / 100, 2)
+    total = subtotal + tax
+    updates = {
+        "customer": input.customer,
+        "customer_id": input.customer_id,
+        "due_date": input.due_date,
+        "subtotal": subtotal,
+        "tax_rate": input.tax_rate,
+        "tax": tax,
+        "total": total,
+        "amount_words": amount_words(total),
+        "template": input.template,
+        "notes": input.notes,
+        "items": [item.model_dump() for item in normalized_items],
+    }
+    updated = await db.audit_invoices.find_one_and_update({"id": invoice_id}, {"$set": updates}, return_document=ReturnDocument.AFTER)
+    return Invoice(**updated)
 
 
 @router.post("/invoices/{invoice_id}/action", response_model=Invoice)
@@ -518,7 +604,15 @@ async def transition_invoice(invoice_id: str, input: InvoiceActionRequest) -> In
     if not doc:
         raise HTTPException(status_code=404, detail="Invoice tidak ditemukan")
     invoice = Invoice(**doc)
-    transitions = {("draft", "send"): "sent", ("sent", "mark_paid"): "paid", ("overdue", "mark_paid"): "paid", ("sent", "mark_overdue"): "overdue"}
+    transitions = {
+        ("draft", "finalize"): "pending",
+        ("draft", "send"): "sent",
+        ("pending", "send"): "sent",
+        ("sent", "mark_paid"): "paid",
+        ("overdue", "mark_paid"): "paid",
+        ("sent", "mark_overdue"): "overdue",
+        ("pending", "mark_overdue"): "overdue",
+    }
     target = transitions.get((invoice.status, input.action))
     if not target:
         raise HTTPException(status_code=409, detail=f"Aksi {input.action} tidak valid untuk invoice {invoice.status}")
@@ -563,7 +657,8 @@ async def invoice_export_context(invoice_id: str) -> tuple[Invoice, CompanyProfi
 @router.get("/invoices/{invoice_id}/export.pdf")
 async def export_invoice_pdf(invoice_id: str):
     invoice, company, customer = await invoice_export_context(invoice_id)
-    payload = build_invoice_pdf(invoice, company, customer)
+    payload = build_invoice_pdf_pro(invoice, company, customer)
+    await log_export("invoice", "pdf", f"Invoice {invoice.number}", scope=invoice.number, row_count=len(invoice.items))
     return StreamingResponse(io.BytesIO(payload), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{invoice.number.replace("/", "-")}.pdf"'})
 
 
@@ -571,6 +666,7 @@ async def export_invoice_pdf(invoice_id: str):
 async def export_invoice_xlsx(invoice_id: str):
     invoice, company, customer = await invoice_export_context(invoice_id)
     payload = build_invoice_xlsx(invoice, company, customer)
+    await log_export("invoice", "xlsx", f"Invoice {invoice.number}", scope=invoice.number, row_count=len(invoice.items))
     return StreamingResponse(io.BytesIO(payload), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{invoice.number.replace("/", "-")}.xlsx"'})
 
 

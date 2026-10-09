@@ -66,3 +66,16 @@ export interface ReportSummary {
   pending_count: number;
   categories: ReportCategory[];
 }
+
+export interface ExportLog {
+  id: string;
+  export_type: string;
+  export_format: "pdf" | "xlsx" | "csv";
+  title: string;
+  scope: string;
+  period_start: string | null;
+  period_end: string | null;
+  row_count: number;
+  actor: string;
+  created_at: string;
+}

@@ -93,10 +93,21 @@ class InvoiceCreate(BaseModel):
     template: Literal["modern", "classic", "minimal"] = "modern"
     notes: str = "Terima kasih atas kepercayaan Anda."
     tax_rate: float = Field(default=11, ge=0, le=100)
+    finalize: bool = False
+
+
+class InvoiceUpdate(BaseModel):
+    customer: str
+    customer_id: str | None = None
+    due_date: str
+    items: list[InvoiceItem] = Field(default_factory=list)
+    template: Literal["modern", "classic", "minimal"] = "modern"
+    notes: str = "Terima kasih atas kepercayaan Anda."
+    tax_rate: float = Field(default=11, ge=0, le=100)
 
 
 class InvoiceActionRequest(BaseModel):
-    action: Literal["send", "mark_paid", "mark_overdue"]
+    action: Literal["finalize", "send", "mark_paid", "mark_overdue"]
 
 
 class Invoice(BaseModel):
@@ -366,4 +377,16 @@ class AssistantDraftReport(BaseModel):
     net_profit: float
     receivables: float
     created_by: str = "Financial Assistant"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ExportLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    export_type: str  # invoice | transactions | report | tax | efaktur | business_report
+    export_format: Literal["pdf", "xlsx", "csv"]
+    title: str = ""
+    scope: str = ""
+    period_start: str | None = None
+    period_end: str | None = None
+    row_count: int = 0
+    actor: str = "Raka Adinata"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
