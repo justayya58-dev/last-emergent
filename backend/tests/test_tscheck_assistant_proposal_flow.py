@@ -29,6 +29,7 @@ def test_session_create_quick_prompts_and_grounded_streaming_response(client):
     session_id = session.json()["id"]
 
     with httpx.Client(base_url=client.base_url, timeout=40.0) as streaming_client:
+        streaming_client.cookies.update(client.cookies)
         with streaming_client.stream(
             "POST",
             f"/auditpro/assistant/sessions/{session_id}/messages",
@@ -59,6 +60,7 @@ def test_proposal_requires_explicit_confirmation_before_creating_draft(client):
 
     proposal_id = None
     with httpx.Client(base_url=client.base_url, timeout=40.0) as streaming_client:
+        streaming_client.cookies.update(client.cookies)
         with streaming_client.stream(
             "POST",
             f"/auditpro/assistant/sessions/{session_id}/messages",
@@ -95,6 +97,7 @@ def test_cancelling_a_proposal_does_not_create_a_draft(client):
     session_id = session["id"]
     proposal_id = None
     with httpx.Client(base_url=client.base_url, timeout=40.0) as streaming_client:
+        streaming_client.cookies.update(client.cookies)
         with streaming_client.stream(
             "POST",
             f"/auditpro/assistant/sessions/{session_id}/messages",
