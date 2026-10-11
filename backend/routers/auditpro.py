@@ -612,50 +612,67 @@ async def transition_invoice(invoice_id: str, input: InvoiceActionRequest) -> In
         ("pending", "send"): "sent",
         ("sent", "mark_paid"): "paid",
         ("overdue", "mark_paid"): "paid",
+        ("payment_processing", "mark_paid"): "paid",
         ("sent", "mark_overdue"): "overdue",
         ("pending", "mark_overdue"): "overdue",
     }
     target = transitions.get((invoice.status, input.action))
     if not target:
         raise HTTPException(status_code=409, detail=f"Aksi {input.action} tidak valid untuk invoice {invoice.status}")
+    if target == "paid":
+        # Claim the invoice first so mark_overdue/another payment cannot race this write.
+        claimed = await db.audit_invoices.find_one_and_update(
+            {"id": invoice_id, "status": invoice.status},
+            {"$set": {"status": "payment_processing", "paid_at": now_iso()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not claimed:
+            raise HTTPException(status_code=409, detail="Status invoice berubah oleh proses lain; muat ulang lalu coba lagi")
+        try:
+            existing_payment = await db.audit_transactions.find_one(
+                {"source": "invoice", "reference_number": invoice.number}
+            )
+            if not existing_payment:
+                transaction = Transaction(
+                    id=f"invoice-payment-{invoice.id}",
+                    source="invoice",
+                    type="income",
+                    transaction_date=today_iso(),
+                    counterparty=invoice.customer,
+                    reference_number=invoice.number,
+                    description=f"Pembayaran {invoice.number}",
+                    category="Penjualan",
+                    subtotal=invoice.subtotal,
+                    tax=invoice.tax,
+                    total=invoice.total,
+                    status="approved",
+                    audit_trail=[event("created", "Dibuat otomatis dari invoice lunas"), event("approved", "Pembayaran invoice dicatat otomatis", "System")],
+                )
+                try:
+                    await db.audit_transactions.insert_one(transaction.model_dump())
+                except DuplicateKeyError:
+                    # Another retry already inserted the deterministic payment transaction.
+                    pass
+            finalized = await db.audit_invoices.find_one_and_update(
+                {"id": invoice_id, "status": "payment_processing"},
+                {"$set": {"status": "paid", "paid_at": now_iso()}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if not finalized:
+                raise HTTPException(status_code=409, detail="Pembayaran sedang diproses; muat ulang untuk memeriksa status")
+            return Invoice(**finalized)
+        except Exception:
+            # If a write failed after the claim, release the claim. Any already-inserted
+            # deterministic payment row is detected on retry and will not be duplicated.
+            await db.audit_invoices.update_one(
+                {"id": invoice_id, "status": "payment_processing"},
+                {"$set": {"status": invoice.status, "paid_at": invoice.paid_at}},
+            )
+            raise
+
     updates: dict[str, object] = {"status": target}
     if target == "sent":
         updates["sent_at"] = now_iso()
-    if target == "paid":
-        updates["paid_at"] = now_iso()
-        # Preserve compatibility with legacy payment rows before relying on the deterministic id.
-        existing_payment = await db.audit_transactions.find_one(
-            {"source": "invoice", "reference_number": invoice.number}
-        )
-        if existing_payment:
-            updated = await db.audit_invoices.find_one_and_update(
-                {"id": invoice_id, "status": invoice.status},
-                {"$set": updates},
-                return_document=ReturnDocument.AFTER,
-            )
-            if not updated:
-                raise HTTPException(status_code=409, detail="Status invoice berubah oleh proses lain; muat ulang lalu coba lagi")
-            return Invoice(**updated)
-        transaction = Transaction(
-            id=f"invoice-payment-{invoice.id}",
-            source="invoice",
-            type="income",
-            transaction_date=today_iso(),
-            counterparty=invoice.customer,
-            reference_number=invoice.number,
-            description=f"Pembayaran {invoice.number}",
-            category="Penjualan",
-            subtotal=invoice.subtotal,
-            tax=invoice.tax,
-            total=invoice.total,
-            status="approved",
-            audit_trail=[event("created", "Dibuat otomatis dari invoice lunas"), event("approved", "Pembayaran invoice dicatat otomatis", "System")],
-        )
-        try:
-            await db.audit_transactions.insert_one(transaction.model_dump())
-        except DuplicateKeyError:
-            # The deterministic transaction id means another request already recorded it.
-            pass
     updated = await db.audit_invoices.find_one_and_update(
         {"id": invoice_id, "status": invoice.status},
         {"$set": updates},
