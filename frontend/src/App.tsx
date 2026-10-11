@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "@/pages/Home";
 
 type AuthState = "checking" | "signed-out" | "signed-in";
 
-function AuthGate({ children }: { children: React.ReactNode }) {
+function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>("checking");
   const [username, setUsername] = useState("auditpro-admin");
   const [password, setPassword] = useState("");
