@@ -8,7 +8,7 @@ import uuid
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pymongo import ReturnDocument
+from pymongo import DuplicateKeyError, ReturnDocument
 
 from lib.dates import today_iso
 from lib.db import db
@@ -623,24 +623,33 @@ async def transition_invoice(invoice_id: str, input: InvoiceActionRequest) -> In
         updates["sent_at"] = now_iso()
     if target == "paid":
         updates["paid_at"] = now_iso()
-        existing = await db.audit_transactions.find_one({"source": "invoice", "reference_number": invoice.number})
-        if not existing:
-            transaction = Transaction(
-                source="invoice",
-                type="income",
-                transaction_date=today_iso(),
-                counterparty=invoice.customer,
-                reference_number=invoice.number,
-                description=f"Pembayaran {invoice.number}",
-                category="Penjualan",
-                subtotal=invoice.subtotal,
-                tax=invoice.tax,
-                total=invoice.total,
-                status="approved",
-                audit_trail=[event("created", "Dibuat otomatis dari invoice lunas"), event("approved", "Pembayaran invoice dicatat otomatis", "System")],
-            )
+        transaction = Transaction(
+            id=f"invoice-payment-{invoice.id}",
+            source="invoice",
+            type="income",
+            transaction_date=today_iso(),
+            counterparty=invoice.customer,
+            reference_number=invoice.number,
+            description=f"Pembayaran {invoice.number}",
+            category="Penjualan",
+            subtotal=invoice.subtotal,
+            tax=invoice.tax,
+            total=invoice.total,
+            status="approved",
+            audit_trail=[event("created", "Dibuat otomatis dari invoice lunas"), event("approved", "Pembayaran invoice dicatat otomatis", "System")],
+        )
+        try:
             await db.audit_transactions.insert_one(transaction.model_dump())
-    updated = await db.audit_invoices.find_one_and_update({"id": invoice_id}, {"$set": updates}, return_document=ReturnDocument.AFTER)
+        except DuplicateKeyError:
+            # The deterministic transaction id means another request already recorded it.
+            pass
+    updated = await db.audit_invoices.find_one_and_update(
+        {"id": invoice_id, "status": invoice.status},
+        {"$set": updates},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not updated:
+        raise HTTPException(status_code=409, detail="Status invoice berubah oleh proses lain; muat ulang lalu coba lagi")
     return Invoice(**updated)
 
 
