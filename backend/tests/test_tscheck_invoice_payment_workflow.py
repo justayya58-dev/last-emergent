@@ -1,3 +1,4 @@
+import httpx
 import uuid
 
 SUFFIX = uuid.uuid4().hex[:8]
