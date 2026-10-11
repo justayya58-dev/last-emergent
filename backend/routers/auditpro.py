@@ -623,6 +623,19 @@ async def transition_invoice(invoice_id: str, input: InvoiceActionRequest) -> In
         updates["sent_at"] = now_iso()
     if target == "paid":
         updates["paid_at"] = now_iso()
+        # Preserve compatibility with legacy payment rows before relying on the deterministic id.
+        existing_payment = await db.audit_transactions.find_one(
+            {"source": "invoice", "reference_number": invoice.number}
+        )
+        if existing_payment:
+            updated = await db.audit_invoices.find_one_and_update(
+                {"id": invoice_id, "status": invoice.status},
+                {"$set": updates},
+                return_document=ReturnDocument.AFTER,
+            )
+            if not updated:
+                raise HTTPException(status_code=409, detail="Status invoice berubah oleh proses lain; muat ulang lalu coba lagi")
+            return Invoice(**updated)
         transaction = Transaction(
             id=f"invoice-payment-{invoice.id}",
             source="invoice",
