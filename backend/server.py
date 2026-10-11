@@ -180,3 +180,5 @@ logger = logging.getLogger(__name__)
 # Include all API routes last so every endpoint remains under /api.
 api_router.include_router(auditpro_router)
 app.include_router(api_router)
+
+# CI trigger: readiness and startup regression coverage.
