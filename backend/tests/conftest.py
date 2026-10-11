@@ -44,8 +44,17 @@ def client():
 
 @pytest_asyncio.fixture
 async def aclient():
-    """Async variant, for tests that also await motor/backend helpers directly."""
+    """Authenticated async variant for tests that use protected API routes."""
     async with httpx.AsyncClient(base_url=API_URL, timeout=30.0) as c:
+        username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
+        password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
+        if password:
+            login = await c.post(
+                "/auth/login", json={"username": username, "password": password}
+            )
+            assert login.status_code == 200, (
+                f"Test auth setup failed: {login.status_code} {login.text}"
+            )
         yield c
 
 
