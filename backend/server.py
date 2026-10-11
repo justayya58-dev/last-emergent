@@ -2,9 +2,9 @@ import hmac
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import FastAPI, APIRouter, Request
-from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager
+from fastapi import FastAPI, APIRouter, Request
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -13,7 +13,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List
 import uuid
-from datetime import datetime
 from routers.auditpro import router as auditpro_router
 
 
@@ -83,7 +82,7 @@ def auth_config() -> tuple[str, str, str]:
 
 
 @api_router.post("/auth/login")
-async def auth_login(request: Request, response: Response):
+async def auth_login(request: Request):
     try:
         username, password, secret = auth_config()
     except RuntimeError as exc:
