@@ -422,10 +422,12 @@ async def transition_transaction(transaction_id: str, input: TransactionActionRe
     action_name = {"submit": "submitted", "approve": "approved", "reject": "rejected"}[input.action]
     audit = event(action_name, input.note or f"Status diubah ke {target}", input.actor)
     updated = await db.audit_transactions.find_one_and_update(
-        {"id": transaction_id},
+        {"id": transaction_id, "status": current.status},
         {"$set": {"status": target, "updated_at": now_iso()}, "$push": {"audit_trail": audit.model_dump()}},
         return_document=ReturnDocument.AFTER,
     )
+    if not updated:
+        raise HTTPException(status_code=409, detail="Status transaksi berubah oleh proses lain; muat ulang lalu coba lagi")
     if current.document_id:
         await db.audit_documents.update_one({"id": current.document_id}, {"$set": {"status": target}})
     return Transaction(**updated)
