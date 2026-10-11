@@ -18,6 +18,14 @@ export class ApiError extends Error {
 
 type JsonBody = unknown;
 
+function handleUnauthorized(status: number) {
+  if (status === 401 && window.location.pathname !== "/") {
+    window.location.assign("/");
+  } else if (status === 401) {
+    window.location.reload();
+  }
+}
+
 async function request<T>(method: string, path: string, body?: JsonBody): Promise<T> {
   // Auth rides the httpOnly session cookie automatically — never add auth headers here.
   const res = await fetch(`${BASE}${path}`, {
@@ -27,6 +35,7 @@ async function request<T>(method: string, path: string, body?: JsonBody): Promis
   });
 
   // FastAPI reports request-validation failures as 422 with a {detail: [...]} body.
+  if (res.status === 401) handleUnauthorized(res.status);
   if (!res.ok) {
     const errBody = await res.json().catch(() => null);
     throw new ApiError(res.status, errBody);
