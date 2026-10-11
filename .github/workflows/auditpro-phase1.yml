@@ -65,12 +65,24 @@ jobs:
           done
           cat /tmp/auditpro-api.log
           exit 1
-      - name: Run Phase 1 regression tests
-        run: |
-          pytest -q \
-            tests/test_tscheck_enterprise_auth_gap.py \
-            tests/test_tscheck_invoice_payment_workflow.py \
-            tests/test_tscheck_invoice_status_workflow.py \
-            tests/test_tscheck_tax_sync_idempotent.py \
-            tests/test_tscheck_tax_sync_race_condition.py \
-            tests/test_tscheck_transaction_approval_audit.py
+      - name: Run complete backend test suite
+        run: pytest -q tests/
+
+  frontend-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package.json
+      - name: Install frontend dependencies
+        run: npm install --no-package-lock
+      - name: Typecheck frontend
+        run: npm run typecheck
+      - name: Build frontend
+        run: npm run build
