@@ -1,7 +1,10 @@
-import base64
 import hmac
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from fastapi import FastAPI, APIRouter, Request
+from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -63,49 +66,95 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
-# Basic authentication protects every API route except the harmless API root.
-# Configure a strong AUDITPRO_ADMIN_PASSWORD before exposing the service.
+AUTH_COOKIE = "auditpro_session"
+AUTH_ALGORITHM = "HS256"
+AUTH_PATHS = {"/api/auth/login", "/api/auth/logout", "/api/auth/me"}
+
+
+def auth_config() -> tuple[str, str, str]:
+    username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
+    password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
+    secret = os.environ.get("AUDITPRO_SESSION_SECRET", "")
+    if len(password) < 16 or len(secret) < 32:
+        raise RuntimeError(
+            "Set AUDITPRO_ADMIN_PASSWORD (min 16 chars) and AUDITPRO_SESSION_SECRET (min 32 chars)."
+        )
+    return username, password, secret
+
+
+@api_router.post("/auth/login")
+async def auth_login(request: Request, response: Response):
+    try:
+        username, password, secret = auth_config()
+    except RuntimeError as exc:
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    supplied_user = str(payload.get("username", ""))
+    supplied_password = str(payload.get("password", ""))
+    if not (
+        hmac.compare_digest(supplied_user.encode(), username.encode())
+        and hmac.compare_digest(supplied_password.encode(), password.encode())
+    ):
+        return JSONResponse(status_code=401, content={"detail": "Username atau password salah."})
+    token = jwt.encode(
+        {"sub": username, "exp": datetime.now(timezone.utc) + timedelta(hours=8)},
+        secret,
+        algorithm=AUTH_ALGORITHM,
+    )
+    result = JSONResponse(content={"authenticated": True, "username": username})
+    result.set_cookie(
+        AUTH_COOKIE, token, httponly=True, secure=os.environ.get("COOKIE_SECURE", "false").lower() == "true",
+        samesite="strict", max_age=8 * 60 * 60, path="/",
+    )
+    return result
+
+
+@api_router.post("/auth/logout")
+async def auth_logout():
+    result = JSONResponse(content={"authenticated": False})
+    result.delete_cookie(AUTH_COOKIE, path="/", httponly=True, samesite="strict")
+    return result
+
+
+@api_router.get("/auth/me")
+async def auth_me(request: Request):
+    token = request.cookies.get(AUTH_COOKIE)
+    if not token:
+        return JSONResponse(status_code=401, content={"detail": "Autentikasi diperlukan."})
+    try:
+        _, _, secret = auth_config()
+        payload = jwt.decode(token, secret, algorithms=[AUTH_ALGORITHM])
+        return {"authenticated": True, "username": payload["sub"]}
+    except (jwt.InvalidTokenError, RuntimeError, KeyError):
+        return JSONResponse(status_code=401, content={"detail": "Sesi tidak valid atau kedaluwarsa."})
+
+
 @app.middleware("http")
-async def require_api_auth(request, call_next):
-    if request.url.path.startswith("/api/") and request.url.path != "/api/":
-        username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
-        password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
-        if len(password) < 16:
-            from starlette.responses import JSONResponse
-            return JSONResponse(
-                status_code=503,
-                content={"detail": "Server auth belum dikonfigurasi; set AUDITPRO_ADMIN_PASSWORD minimal 16 karakter."},
-            )
-        authorization = request.headers.get("authorization", "")
-        supplied_user = ""
-        supplied_password = ""
-        if authorization.startswith("Basic "):
-            try:
-                decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
-                supplied_user, supplied_password = decoded.split(":", 1)
-            except (ValueError, UnicodeDecodeError):
-                pass
-        valid_user = hmac.compare_digest(supplied_user.encode(), username.encode())
-        valid_password = hmac.compare_digest(supplied_password.encode(), password.encode())
-        if not (valid_user and valid_password):
-            from starlette.responses import JSONResponse
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Autentikasi diperlukan."},
-                headers={"WWW-Authenticate": 'Basic realm="AuditPro", charset="UTF-8"'},
-            )
+async def require_api_auth(request: Request, call_next):
+    if request.url.path.startswith("/api/") and request.url.path not in AUTH_PATHS and request.method != "OPTIONS":
+        token = request.cookies.get(AUTH_COOKIE)
+        try:
+            _, _, secret = auth_config()
+            if not token:
+                raise jwt.InvalidTokenError("missing session")
+            jwt.decode(token, secret, algorithms=[AUTH_ALGORITHM])
+        except (jwt.InvalidTokenError, RuntimeError):
+            return JSONResponse(status_code=401, content={"detail": "Sesi tidak valid atau kedaluwarsa."})
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
 cors_origins = [
     origin.strip()
     for origin in os.environ.get(
-        "CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:5173",
+        "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"
     ).split(",")
     if origin.strip()
 ]
