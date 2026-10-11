@@ -51,5 +51,11 @@ async def ensure_indexes() -> None:
         for model in models:  # one at a time so a bad spec skips only itself
             try:
                 await db[collection].create_indexes([model])
-            except Exception as exc:  # never block boot on an index; the log line names what to fix
-                logger.error("ensure_indexes(%s.%s): %s", collection, model.document["name"], exc)
+            except Exception as exc:
+                logger.exception("ensure_indexes(%s.%s) failed", collection, model.document["name"])
+                # Unique indexes enforce correctness (payment idempotency, invoice identity,
+                # tax sync idempotency). Fail startup rather than serve unsafe writes.
+                if model.document.get("unique", False):
+                    raise RuntimeError(
+                        f"Required unique index {collection}.{model.document['name']} is unavailable"
+                    ) from exc
