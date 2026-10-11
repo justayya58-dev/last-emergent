@@ -36,6 +36,21 @@ def _extract_json(content: str) -> dict:
 
 
 async def extract_invoice(file_bytes: bytes, mime_type: str, suffix: str) -> tuple[ExtractionData, int]:
+    # Deterministic fixture extraction is only enabled in the isolated CI environment.
+    # Never enable AUDITPRO_TEST_OCR in production deployments.
+    if os.environ.get("AUDITPRO_TEST_OCR") == "true":
+        extraction = ExtractionData(
+            vendor="PT Tscheck Mandiri Jaya",
+            invoice_number="TSK-INV-90210",
+            invoice_date="2026-05-01",
+            due_date="2026-05-31",
+            subtotal=500000,
+            tax=55000,
+            total=555000,
+            category="Operasional",
+        )
+        return extraction, 98
+
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         raise OcrExtractionError("Layanan OCR belum dikonfigurasi")
