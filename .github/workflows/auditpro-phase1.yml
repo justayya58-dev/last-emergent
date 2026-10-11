@@ -1,0 +1,72 @@
+name: AuditPro Phase 1 regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/src/App.tsx"
+      - "docs/auditpro-phase1-security.md"
+      - ".github/workflows/auditpro-phase1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/src/App.tsx"
+      - "docs/auditpro-phase1-security.md"
+      - ".github/workflows/auditpro-phase1.yml"
+
+jobs:
+  backend-regression:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: auditpro_ci
+      AUDITPRO_ADMIN_USERNAME: auditpro-admin
+      AUDITPRO_ADMIN_PASSWORD: ci-only-password-123456
+      AUDITPRO_SESSION_SECRET: ci-only-session-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+      CORS_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: "false"
+      BACKEND_URL: http://127.0.0.1:8001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Compile backend
+        run: python -m compileall -q .
+      - name: Start API
+        run: |
+          uvicorn server:app --host 127.0.0.1 --port 8001 > /tmp/auditpro-api.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl --silent --fail http://127.0.0.1:8001/api/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/auditpro-api.log
+          exit 1
+      - name: Run Phase 1 regression tests
+        run: |
+          pytest -q \
+            tests/test_tscheck_enterprise_auth_gap.py \
+            tests/test_tscheck_invoice_payment_workflow.py \
+            tests/test_tscheck_invoice_status_workflow.py \
+            tests/test_tscheck_tax_sync_idempotent.py \
+            tests/test_tscheck_tax_sync_race_condition.py \
+            tests/test_tscheck_transaction_approval_audit.py
