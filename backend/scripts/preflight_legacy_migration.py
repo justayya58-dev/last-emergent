@@ -19,7 +19,10 @@ async def main() -> int:
             spec = model.document
             if not spec.get("unique", False):
                 continue
-            key_fields = [field for field, _direction in spec["key"]]
+            key_spec = spec["key"]
+            key_fields = list(key_spec.keys()) if hasattr(key_spec, "keys") else [
+                field for field, _direction in key_spec
+            ]
             group_key = {field: f"${field}" for field in key_fields}
             pipeline = [
                 {"$group": {"_id": group_key, "count": {"$sum": 1}}},
