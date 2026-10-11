@@ -36,13 +36,14 @@ Do not point a first production deployment at the only copy of the legacy databa
 2. Restore the snapshot to a staging database and verify row/document counts.
 3. Export encrypted backups and test a restore before migration.
 4. Inventory collections and schema versions; preserve original identifiers and timestamps.
-5. Before enabling unique indexes, scan duplicates for every unique index in `backend/lib/db.py`, especially invoice identity, transaction/payment IDs, and tax `(source_type, source_id)`. Do not auto-delete duplicates.
-6. Produce a reconciliation report: duplicate key, document IDs, counts, and a proposed resolution owner. Resolve with an approved mapping; preserve an audit record.
-7. Run index creation against staging first. The API intentionally fails startup if a required unique index cannot be created.
-8. Compare counts and financial control totals before/after migration (invoice totals, paid invoice count, income/payment transaction totals, tax document counts). Investigate every variance.
-9. Run the full backend suite and authenticated smoke tests against staging.
-10. Schedule a maintenance window, take a fresh backup, apply the reviewed migration, verify control totals, then allow writes.
-11. Keep rollback instructions and the pre-migration snapshot until sign-off. Never make an irreversible schema/data change without a tested restore path.
+5. Before enabling unique indexes, run the read-only duplicate scan from `backend/`: `python scripts/preflight_legacy_migration.py`. It reports duplicate groups without changing data. Scan every unique index in `backend/lib/db.py`, especially invoice identity, transaction/payment IDs, and tax `(source_type, source_id)`. Do not auto-delete duplicates.
+6. Run a real provider smoke test against a non-sensitive fixture in staging: `python scripts/smoke_ai_ocr.py /secure/path/to/non-sensitive-invoice.pdf` with the real `EMERGENT_LLM_KEY` configured and `AUDITPRO_TEST_OCR` unset/false. This calls the configured Gemini integration, prints no extracted values, and does not replace manual field-by-field verification.
+7. Produce a reconciliation report: duplicate key, document IDs, counts, and a proposed resolution owner. Resolve with an approved mapping; preserve an audit record.
+8. Run index creation against staging first. The API intentionally fails startup if a required unique index cannot be created.
+9. Compare counts and financial control totals before/after migration (invoice totals, paid invoice count, income/payment transaction totals, tax document counts). Investigate every variance.
+10. Run the full backend suite and authenticated smoke tests against staging.
+11. Schedule a maintenance window, take a fresh backup, apply the reviewed migration, verify control totals, then allow writes.
+12. Keep rollback instructions and the pre-migration snapshot until sign-off. Never make an irreversible schema/data change without a tested restore path.
 
 ## Deployment controls
 
