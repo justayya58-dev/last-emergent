@@ -63,10 +63,10 @@ def test_concurrent_mark_paid_records_only_one_income_transaction(client):
 
     def mark_paid():
         with httpx.Client(base_url=str(client.base_url), timeout=30.0) as concurrent_client:
-            login = concurrent_client.post("/auth/login", json={"username": username, "password": password})
+            login = concurrent_client.post("auth/login", json={"username": username, "password": password})
             assert login.status_code == 200, login.text
             return concurrent_client.post(
-                f"/auditpro/invoices/{invoice_id}/action",
+                f"auditpro/invoices/{invoice_id}/action",
                 json={"action": "mark_paid"},
             )
 
