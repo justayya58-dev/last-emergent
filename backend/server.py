@@ -135,7 +135,7 @@ async def auth_me(request: Request):
 
 @app.middleware("http")
 async def require_api_auth(request: Request, call_next):
-    if request.url.path.startswith("/api/") and request.url.path not in AUTH_PATHS and request.method != "OPTIONS":
+    if request.url.path.startswith("/api/") and request.url.path not in AUTH_PATHS and request.url.path != "/api/" and request.method != "OPTIONS":
         token = request.cookies.get(AUTH_COOKIE)
         try:
             _, _, secret = auth_config()
