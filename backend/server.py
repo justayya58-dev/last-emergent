@@ -1,3 +1,5 @@
+import base64
+import hmac
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
@@ -61,12 +63,61 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
+# Basic authentication protects every API route except the harmless API root.
+# Configure a strong AUDITPRO_ADMIN_PASSWORD before exposing the service.
+@app.middleware("http")
+async def require_api_auth(request, call_next):
+    if request.url.path.startswith("/api/") and request.url.path != "/api/":
+        username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
+        password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
+        if len(password) < 16:
+            from starlette.responses import JSONResponse
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Server auth belum dikonfigurasi; set AUDITPRO_ADMIN_PASSWORD minimal 16 karakter."},
+            )
+        authorization = request.headers.get("authorization", "")
+        supplied_user = ""
+        supplied_password = ""
+        if authorization.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
+                supplied_user, supplied_password = decoded.split(":", 1)
+            except (ValueError, UnicodeDecodeError):
+                pass
+        valid_user = hmac.compare_digest(supplied_user.encode(), username.encode())
+        valid_password = hmac.compare_digest(supplied_password.encode(), password.encode())
+        if not (valid_user and valid_password):
+            from starlette.responses import JSONResponse
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Autentikasi diperlukan."},
+                headers={"WWW-Authenticate": 'Basic realm="AuditPro", charset="UTF-8"'},
+            )
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+]
+if not cors_origins or "*" in cors_origins:
+    raise RuntimeError("CORS_ORIGINS harus berisi origin eksplisit; wildcard tidak diizinkan.")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Configure logging
