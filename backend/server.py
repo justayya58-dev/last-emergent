@@ -26,6 +26,8 @@ from lib.db import client, db, ensure_indexes
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail closed before serving production traffic.
+    validate_runtime_configuration()
     # Do not accept API traffic until correctness-critical indexes are ready.
     await ensure_indexes()
     yield
@@ -169,6 +171,27 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+def validate_runtime_configuration() -> None:
+    """Fail closed on incomplete production security/provider settings."""
+    if os.environ.get("APP_ENV", "development").strip().lower() != "production":
+        return
+
+    username, _, _ = auth_config()
+    if username == "auditpro-admin":
+        raise RuntimeError("Production must set a non-default AUDITPRO_ADMIN_USERNAME.")
+    if os.environ.get("COOKIE_SECURE", "").strip().lower() != "true":
+        raise RuntimeError("Production must set COOKIE_SECURE=true and serve over HTTPS.")
+    if os.environ.get("AUDITPRO_TEST_OCR", "").strip().lower() == "true":
+        raise RuntimeError("AUDITPRO_TEST_OCR is forbidden in production.")
+    if not os.environ.get("EMERGENT_LLM_KEY", "").strip():
+        raise RuntimeError("Production must configure EMERGENT_LLM_KEY for real AI/OCR.")
+    if any("localhost" in origin.lower() or "127.0.0.1" in origin.lower() for origin in cors_origins):
+        raise RuntimeError("Production CORS_ORIGINS must not include localhost or 127.0.0.1.")
+    mongo_url_value = os.environ.get("MONGO_URL", "").lower()
+    if not (mongo_url_value.startswith("mongodb+srv://") or "tls=true" in mongo_url_value):
+        raise RuntimeError("Production MongoDB connection must use TLS (mongodb+srv or tls=true).")
+
 
 # Configure logging
 logging.basicConfig(
