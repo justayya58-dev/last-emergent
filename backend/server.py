@@ -1,4 +1,3 @@
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
@@ -23,7 +22,8 @@ from lib.db import client, db, ensure_indexes
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.index_task = asyncio.create_task(ensure_indexes())  # background: a big index build must not block boot
+    # Do not accept API traffic until correctness-critical indexes are ready.
+    await ensure_indexes()
     yield
     client.close()
 
