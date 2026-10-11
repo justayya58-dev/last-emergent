@@ -10,6 +10,16 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 export default [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    files: ["src/lib/**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["@/modules/**", "../modules/**", "../../modules/**", "../../../modules/**", "../../../../modules/**"], message: "lib/ is infrastructure-only and must not import domain modules." }
+        ]
+      }]
+    }
+  },
+  {
     files: ["src/**/*.{js,jsx,ts,tsx}"],
     plugins: { boundaries },
     settings: {
