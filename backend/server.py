@@ -91,6 +91,8 @@ async def auth_login(request: Request):
         payload = await request.json()
     except Exception:
         payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
     supplied_user = str(payload.get("username", ""))
     supplied_password = str(payload.get("password", ""))
     if not (
