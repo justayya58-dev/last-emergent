@@ -42,6 +42,8 @@ jobs:
       COOKIE_SECURE: "false"
       BACKEND_URL: http://127.0.0.1:8001
       PYTHONPATH: ${{ github.workspace }}/.ci-stubs
+      EMERGENT_LLM_KEY: ci-only-test-key
+      AUDITPRO_TEST_OCR: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
