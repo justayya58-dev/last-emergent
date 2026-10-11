@@ -334,7 +334,7 @@ class AssistantProposal(BaseModel):
     session_id: str
     type: Literal["draft_invoice", "draft_report"]
     title: str
-    status: Literal["pending", "confirmed", "cancelled"] = "pending"
+    status: Literal["pending", "processing", "confirmed", "cancelled"] = "pending"
     payload: DraftInvoiceProposalPayload | DraftReportProposalPayload
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     decided_at: str | None = None
