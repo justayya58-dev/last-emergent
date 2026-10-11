@@ -90,3 +90,5 @@ jobs:
         run: yarn typecheck
       - name: Build frontend
         run: yarn build
+
+# Production migration preflight and runtime configuration regression gates.
