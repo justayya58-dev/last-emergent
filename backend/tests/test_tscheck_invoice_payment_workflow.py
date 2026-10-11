@@ -1,3 +1,4 @@
+import httpx
 import uuid
 
 SUFFIX = uuid.uuid4().hex[:8]
@@ -44,3 +45,41 @@ def test_invalid_invoice_transition_is_rejected(client):
     # cannot mark_paid directly from draft
     response = client.post(f"/auditpro/invoices/{invoice['id']}/action", json={"action": "mark_paid"})
     assert response.status_code == 409
+
+
+def test_concurrent_mark_paid_records_only_one_income_transaction(client):
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+
+    username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
+    password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
+    if not password:
+        import pytest
+        pytest.skip("Set AUDITPRO_ADMIN_PASSWORD to run authenticated concurrency tests")
+
+    invoice = create_invoice(client, due_date="2030-03-01")
+    invoice_id = invoice["id"]
+    sent = client.post(f"/auditpro/invoices/{invoice_id}/action", json={"action": "send"})
+    assert sent.status_code == 200, sent.text
+
+    def mark_paid():
+        with httpx.Client(base_url=str(client.base_url), timeout=30.0) as concurrent_client:
+            login = concurrent_client.post("auth/login", json={"username": username, "password": password})
+            assert login.status_code == 200, login.text
+            return concurrent_client.post(
+                f"auditpro/invoices/{invoice_id}/action",
+                json={"action": "mark_paid"},
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(lambda _: mark_paid(), range(2)))
+
+    assert sum(response.status_code == 200 for response in responses) == 1
+    assert all(response.status_code in (200, 409) for response in responses)
+    transactions = client.get("/auditpro/transactions")
+    assert transactions.status_code == 200, transactions.text
+    matches = [
+        item for item in transactions.json()
+        if item["source"] == "invoice" and item["reference_number"] == invoice["number"]
+    ]
+    assert len(matches) == 1

@@ -125,7 +125,7 @@ class Invoice(BaseModel):
     currency: str = "IDR"
     template: Literal["modern", "classic", "minimal"] = "modern"
     notes: str = ""
-    status: Literal["paid", "pending", "sent", "overdue", "draft"]
+    status: Literal["paid", "pending", "sent", "overdue", "draft", "payment_processing"]
     sent_at: str | None = None
     paid_at: str | None = None
     items: list[InvoiceItem] = Field(default_factory=list)
@@ -334,7 +334,7 @@ class AssistantProposal(BaseModel):
     session_id: str
     type: Literal["draft_invoice", "draft_report"]
     title: str
-    status: Literal["pending", "confirmed", "cancelled"] = "pending"
+    status: Literal["pending", "processing", "confirmed", "cancelled"] = "pending"
     payload: DraftInvoiceProposalPayload | DraftReportProposalPayload
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     decided_at: str | None = None

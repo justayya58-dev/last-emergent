@@ -29,12 +29,23 @@ def test_concurrent_tax_document_sync_does_not_500(client):
     assert client.post(f"/auditpro/transactions/{tid}/action", json={"action": "submit"}).status_code == 200
     assert client.post(f"/auditpro/transactions/{tid}/action", json={"action": "approve"}).status_code == 200
 
+    # Each independent async client must carry the authenticated session cookie.
+    session_cookie = client.cookies.get("auditpro_session")
+    assert session_cookie, "client fixture must authenticate before the concurrency test"
+
+    async def fetch_documents():
+        async with httpx.AsyncClient(
+            base_url=str(client.base_url),
+            timeout=30.0,
+            cookies={"auditpro_session": session_cookie},
+        ) as async_client:
+            return await async_client.get("/auditpro/tax/documents")
+
     async def fire_concurrent_requests():
-        async with httpx.AsyncClient(base_url=str(client.base_url), timeout=30.0) as async_client:
-            return await asyncio.gather(
-                *[async_client.get("/auditpro/tax/documents") for _ in range(6)],
-                return_exceptions=True,
-            )
+        return await asyncio.gather(
+            *[fetch_documents() for _ in range(6)],
+            return_exceptions=True,
+        )
 
     results = asyncio.run(fire_concurrent_requests())
     statuses = [r.status_code if not isinstance(r, Exception) else "exception" for r in results]

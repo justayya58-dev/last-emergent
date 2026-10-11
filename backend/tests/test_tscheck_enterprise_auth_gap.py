@@ -1,10 +1,7 @@
-def test_no_authentication_is_enforced_on_sensitive_endpoints(client):
-    """Documents the current single-user/no-login posture (Tahap 5 enterprise auth not implemented).
-
-    Every workspace endpoint accepts anonymous requests; there is no 401/403 gate, no role header,
-    and no per-user scoping. This is a GAP against the enterprise acceptance criterion, not a
-    regression, since no auth/roles have ever been declared complete in memory/SPEC.md.
-    """
+"""Regression tests for the workspace authentication boundary."""
+def test_sensitive_endpoints_reject_anonymous_requests(client):
+    # The client fixture logs in when AUDITPRO_ADMIN_PASSWORD is configured.
+    client.cookies.clear()
     for method, path, kwargs in [
         ("get", "/auditpro/dashboard", {}),
         ("get", "/auditpro/transactions", {}),
@@ -15,14 +12,30 @@ def test_no_authentication_is_enforced_on_sensitive_endpoints(client):
         ("get", "/auditpro/tax/summary", {}),
     ]:
         response = getattr(client, method)(path, **kwargs)
-        assert response.status_code < 401, f"{method.upper()} {path} unexpectedly required auth: {response.status_code}"
+        assert response.status_code == 401, f"{method.upper()} {path}: expected 401, got {response.status_code}"
 
 
-def test_no_role_or_permission_field_exists_on_transaction_schema(client):
-    response = client.get("/auditpro/transactions")
+def test_login_rejects_invalid_credentials(client):
+    client.cookies.clear()
+    response = client.post("/auth/login", json={"username": "not-admin", "password": "incorrect"})
+    assert response.status_code in (401, 503), response.text
+
+
+def test_configured_admin_login_issues_http_only_session_cookie(client):
+    import os
+
+    username = os.environ.get("AUDITPRO_ADMIN_USERNAME", "auditpro-admin")
+    password = os.environ.get("AUDITPRO_ADMIN_PASSWORD", "")
+    if not password:
+        import pytest
+        pytest.skip("Set AUDITPRO_ADMIN_PASSWORD in the test environment")
+    client.cookies.clear()
+    response = client.post("/auth/login", json={"username": username, "password": password})
     assert response.status_code == 200, response.text
-    rows = response.json()
-    assert rows, "expected at least one transaction to inspect the schema"
-    sample = rows[0]
-    for absent_field in ("approver_role", "required_role", "permissions", "approval_threshold"):
-        assert absent_field not in sample
+    cookie = response.headers.get("set-cookie", "").lower()
+    assert "auditpro_session=" in cookie
+    assert "httponly" in cookie
+    assert "samesite=strict" in cookie
+    assert "max-age=28800" in cookie
+    assert client.get("/auth/me").status_code == 200
+    assert client.get("/auditpro/dashboard").status_code == 200

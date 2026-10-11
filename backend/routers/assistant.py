@@ -288,6 +288,9 @@ ATURAN KEAMANAN WAJIB:
 
 
 async def confirm_invoice_proposal(proposal: AssistantProposal, payload: DraftInvoiceProposalPayload) -> str:
+    existing = await db.audit_invoices.find_one({"assistant_proposal_id": proposal.id})
+    if existing:
+        return existing["id"]
     year = date.fromisoformat(today_iso()).year
     counter = await db.audit_counters.find_one_and_update({"_id": f"invoice-{year}"}, {"$inc": {"value": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
     normalized_items = [InvoiceItem(product_id=item.product_id, description=item.description, unit=item.unit, quantity=item.quantity, price=item.price, total=round(item.quantity * item.price, 2)) for item in payload.items]
@@ -295,18 +298,37 @@ async def confirm_invoice_proposal(proposal: AssistantProposal, payload: DraftIn
     tax = round(subtotal * payload.tax_rate / 100, 2)
     total = subtotal + tax
     invoice = Invoice(number=f"INV/AS/{year}/{counter['value']:04d}", customer=payload.customer, customer_id=payload.customer_id, issue_date=today_iso(), due_date=payload.due_date, subtotal=subtotal, tax_rate=payload.tax_rate, tax=tax, total=total, amount_words=amount_words(total), template=payload.template, notes=payload.notes, status="draft", items=normalized_items)
-    await db.audit_invoices.insert_one(invoice.model_dump())
-    return invoice.id
+    document = invoice.model_dump()
+    document["assistant_proposal_id"] = proposal.id
+    try:
+        await db.audit_invoices.insert_one(document)
+        return invoice.id
+    except Exception:
+        existing = await db.audit_invoices.find_one({"assistant_proposal_id": proposal.id})
+        if existing:
+            return existing["id"]
+        raise
 
 
-async def confirm_report_proposal(payload: DraftReportProposalPayload) -> str:
+async def confirm_report_proposal(proposal: AssistantProposal, payload: DraftReportProposalPayload) -> str:
+    existing = await db.assistant_draft_reports.find_one({"assistant_proposal_id": proposal.id})
+    if existing:
+        return existing["id"]
     transactions = [Transaction(**doc) for doc in await db.audit_transactions.find({"status": "approved", "transaction_date": {"$gte": payload.period_start, "$lte": payload.period_end}}).to_list(2000)]
     invoices = [Invoice(**doc) for doc in await db.audit_invoices.find({"status": {"$in": ["sent", "overdue", "pending"]}}).to_list(1000)]
     sales = sum(item.total for item in transactions if item.type == "income")
     expenses = sum(item.total for item in transactions if item.type == "expense")
     report = AssistantDraftReport(title=payload.title, period_start=payload.period_start, period_end=payload.period_end, summary_focus=payload.summary_focus, sales_total=sales, expense_total=expenses, net_profit=sales - expenses, receivables=sum(item.total for item in invoices))
-    await db.assistant_draft_reports.insert_one(report.model_dump())
-    return report.id
+    document = report.model_dump()
+    document["assistant_proposal_id"] = proposal.id
+    try:
+        await db.assistant_draft_reports.insert_one(document)
+        return report.id
+    except Exception:
+        existing = await db.assistant_draft_reports.find_one({"assistant_proposal_id": proposal.id})
+        if existing:
+            return existing["id"]
+        raise
 
 
 @router.post("/proposals/{proposal_id}/decision", response_model=AssistantProposal)
@@ -314,18 +336,37 @@ async def decide_proposal(proposal_id: str, input: AssistantProposalDecision) ->
     raw = await db.assistant_proposals.find_one({"id": proposal_id})
     if not raw:
         raise HTTPException(status_code=404, detail="Proposal tidak ditemukan")
-    proposal = AssistantProposal(**raw)
-    if proposal.status != "pending":
-        raise HTTPException(status_code=409, detail="Proposal sudah diputuskan")
+    claimed = await db.assistant_proposals.find_one_and_update(
+        {"id": proposal_id, "status": "pending"},
+        {"$set": {"status": "processing"}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail="Proposal sudah diputuskan atau sedang diproses")
+    proposal = AssistantProposal(**claimed)
     result_id: str | None = None
-    if input.confirm:
-        if proposal.type == "draft_invoice":
-            result_id = await confirm_invoice_proposal(proposal, DraftInvoiceProposalPayload.model_validate(proposal.payload))
-        elif proposal.type == "draft_report":
-            result_id = await confirm_report_proposal(DraftReportProposalPayload.model_validate(proposal.payload))
-        else:
-            raise HTTPException(status_code=400, detail="Tipe proposal tidak diizinkan")
-    status = "confirmed" if input.confirm else "cancelled"
-    updated = await db.assistant_proposals.find_one_and_update({"id": proposal_id}, {"$set": {"status": status, "decided_at": now_iso(), "result_id": result_id}}, return_document=ReturnDocument.AFTER)
+    try:
+        if input.confirm:
+            if proposal.type == "draft_invoice":
+                result_id = await confirm_invoice_proposal(proposal, DraftInvoiceProposalPayload.model_validate(proposal.payload))
+            elif proposal.type == "draft_report":
+                result_id = await confirm_report_proposal(proposal, DraftReportProposalPayload.model_validate(proposal.payload))
+            else:
+                raise HTTPException(status_code=400, detail="Tipe proposal tidak diizinkan")
+        status = "confirmed" if input.confirm else "cancelled"
+        updated = await db.assistant_proposals.find_one_and_update(
+            {"id": proposal_id, "status": "processing"},
+            {"$set": {"status": status, "decided_at": now_iso(), "result_id": result_id}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not updated:
+            raise HTTPException(status_code=409, detail="Status proposal berubah saat diproses")
+    except Exception:
+        # Result creation is idempotent by assistant_proposal_id, so a retry is safe.
+        await db.assistant_proposals.update_one(
+            {"id": proposal_id, "status": "processing"},
+            {"$set": {"status": "pending"}},
+        )
+        raise
     await write_audit(proposal.session_id, "proposal_confirmed" if input.confirm else "proposal_cancelled", f"{proposal.type}: {proposal.title}")
     return AssistantProposal(**updated)
