@@ -4,6 +4,7 @@ import base64
 from datetime import date, datetime, timezone
 import io
 import logging
+import os
 import uuid
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -109,6 +110,8 @@ def demo_invoices() -> list[Invoice]:
 
 
 async def ensure_demo_documents() -> None:
+    if os.environ.get("APP_ENV", "development").strip().lower() == "production":
+        return
     if await db.audit_documents.count_documents({}) == 0:
         await db.audit_documents.insert_many([item.model_dump() for item in demo_documents()])
     await db.audit_documents.update_many({"status": "validated"}, {"$set": {"status": "approved"}})
@@ -117,6 +120,8 @@ async def ensure_demo_documents() -> None:
 
 
 async def ensure_demo_invoices() -> None:
+    if os.environ.get("APP_ENV", "development").strip().lower() == "production":
+        return
     if await db.audit_invoices.count_documents({}) == 0:
         await db.audit_invoices.insert_many([item.model_dump() for item in demo_invoices()])
 
@@ -151,6 +156,8 @@ def demo_products() -> list[Product]:
 
 
 async def ensure_master_data() -> None:
+    if os.environ.get("APP_ENV", "development").strip().lower() == "production":
+        return
     if await db.audit_company.count_documents({}) == 0:
         await db.audit_company.insert_one(default_company().model_dump())
     if await db.audit_customers.count_documents({}) == 0:
@@ -210,6 +217,8 @@ def demo_transactions() -> list[Transaction]:
 
 
 async def ensure_demo_transactions() -> None:
+    if os.environ.get("APP_ENV", "development").strip().lower() == "production":
+        return
     if await db.audit_transactions.count_documents({}) == 0:
         await db.audit_transactions.insert_many([item.model_dump() for item in demo_transactions()])
 
