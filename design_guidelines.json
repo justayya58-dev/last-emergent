@@ -1,154 +1,269 @@
 {
-  "project_name": "AuditPro AI",
-  "archetype": "Swiss & High-Contrast Tactical Finance Workspace (Archetype 4)",
-  "app_type": "hybrid_fullstack",
-  "theme": {
-    "default_mode": "dark",
-    "theme_switch_supported": true,
-    "dark_palette": {
-      "background": "#090D16",
-      "surface": "#111827",
-      "surface_hover": "#1F2937",
-      "surface_border": "rgba(255, 255, 255, 0.08)",
-      "primary": "#10B981",
-      "primary_hover": "#059669",
-      "primary_text": "#022C22",
-      "accent_cyan": "#06B6D4",
-      "warning": "#F59E0B",
-      "danger": "#EF4444",
-      "success": "#10B981",
-      "text_main": "#F9FAFB",
-      "text_muted": "#9CA3AF",
-      "text_dim": "#6B7280"
-    },
-    "light_palette": {
-      "background": "#F8FAFC",
-      "surface": "#FFFFFF",
-      "surface_hover": "#F1F5F9",
-      "surface_border": "rgba(15, 23, 42, 0.08)",
-      "primary": "#059669",
-      "primary_hover": "#047857",
-      "primary_text": "#FFFFFF",
-      "accent_cyan": "#0891B2",
-      "warning": "#D97706",
-      "danger": "#DC2626",
-      "success": "#059669",
-      "text_main": "#0F172A",
-      "text_muted": "#475569",
-      "text_dim": "#94A3B8"
+  "theme_strategy": {
+    "default_mode": "light",
+    "supported_modes": ["light", "dark", "custom_accent"],
+    "description": "Professional ERP Light-first design with neutral slate/zinc foundations, crisp 1px borders, subtle surface elevations, and dynamic custom accent branding that controls interactive highlights and primary CTAs.",
+    "theme_switch_mechanism": {
+      "storage_key": "auditpro_theme_config",
+      "default_accent": "#0284C7",
+      "preset_accents": [
+        {"name": "Corporate Blue", "value": "#0284C7"},
+        {"name": "Emerald Finance", "value": "#059669"},
+        {"name": "Indigo Tech", "value": "#4F46E5"},
+        {"name": "Royal Purple", "value": "#7C3AED"},
+        {"name": "Warm Amber", "value": "#D97706"},
+        {"name": "Slate Steel", "value": "#475569"}
+      ],
+      "css_variable_mapping": {
+        "light_root": ":root { --background: #F8FAFC; --foreground: #0F172A; --card: #FFFFFF; --card-foreground: #0F172A; --sidebar: #FFFFFF; --sidebar-foreground: #1E293B; --border: #E2E8F0; --input: #E2E8F0; --muted: #F1F5F9; --muted-foreground: #64748B; --accent: var(--brand-accent, #0284C7); --accent-foreground: #FFFFFF; --radius: 0.5rem; }",
+        "dark_root": ".dark { --background: #0B0F17; --foreground: #F8FAFC; --card: #111827; --card-foreground: #F8FAFC; --sidebar: #0E1524; --sidebar-foreground: #E2E8F0; --border: #1F2937; --input: #1F2937; --muted: #1E293B; --muted-foreground: #94A3B8; --accent: var(--brand-accent, #38BDF8); --accent-foreground: #0F172A; }"
+      }
+    }
+  },
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#0284C7",
+          "error": "#DC2626",
+          "success": "#16A34A",
+          "warning": "#D97706"
+        }
+      },
+      {
+        "name": "page_dark",
+        "kind": "solid",
+        "bg": "#0B0F17",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#F87171",
+          "success": "#4ADE80",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "border": "#E2E8F0",
+          "hover_bg": "#F1F5F9"
+        }
+      },
+      {
+        "name": "panel_dark",
+        "kind": "solid",
+        "bg": "#111827",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "border": "#1F2937",
+          "hover_bg": "#1E293B"
+        }
+      },
+      {
+        "name": "sidebar",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#1E293B",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "active_item_bg": "#F0F9FF",
+          "active_item_text": "#0284C7",
+          "border": "#E2E8F0"
+        }
+      },
+      {
+        "name": "sidebar_dark",
+        "kind": "solid",
+        "bg": "#0E1524",
+        "on_bg": "#E2E8F0",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "active_item_bg": "#0C4A6E",
+          "active_item_text": "#38BDF8",
+          "border": "#1F2937"
+        }
+      },
+      {
+        "name": "badge_success",
+        "kind": "solid",
+        "bg": "#ECFDF5",
+        "on_bg": "#065F46",
+        "on_bg_muted": "#047857"
+      },
+      {
+        "name": "badge_warning",
+        "kind": "solid",
+        "bg": "#FFFBEB",
+        "on_bg": "#92400E",
+        "on_bg_muted": "#B45309"
+      },
+      {
+        "name": "badge_danger",
+        "kind": "solid",
+        "bg": "#FEF2F2",
+        "on_bg": "#991B1B",
+        "on_bg_muted": "#B91C1C"
+      },
+      {
+        "name": "badge_info",
+        "kind": "solid",
+        "bg": "#EFF6FF",
+        "on_bg": "#1E40AF",
+        "on_bg_muted": "#1D4ED8"
+      },
+      {
+        "name": "badge_neutral",
+        "kind": "solid",
+        "bg": "#F1F5F9",
+        "on_bg": "#334155",
+        "on_bg_muted": "#475569"
+      }
+    ],
+    "accent": "#0284C7",
+    "on_accent": "#FFFFFF",
+    "charts": {
+      "series_revenue": "#0284C7",
+      "series_expense": "#EF4444",
+      "series_net_profit": "#10B981",
+      "series_ar_receivable": "#F59E0B",
+      "grid_lines": "#E2E8F0",
+      "grid_lines_dark": "#1F2937"
     }
   },
   "typography": {
-    "headings": {
-      "font_family": "Plus Jakarta Sans, Clash Display, sans-serif",
-      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight",
-      "h2": "text-2xl sm:text-3xl font-bold tracking-tight",
-      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
-      "h4": "text-lg font-semibold tracking-normal"
+    "font_family_heading": "'Manrope Variable', sans-serif",
+    "font_family_body": "'Plus Jakarta Sans Variable', sans-serif",
+    "font_family_mono": "'JetBrains Mono Variable', monospace",
+    "import_statement": "@import '@fontsource-variable/manrope'; @import '@fontsource-variable/plus-jakarta-sans'; @import '@fontsource-variable/jetbrains-mono';",
+    "scale_px": {
+      "display": 48,
+      "h1": 36,
+      "h2": 28,
+      "h3": 20,
+      "body": 16,
+      "caption": 14
     },
-    "body": {
-      "font_family": "IBM Plex Sans, Inter, sans-serif",
-      "size_base": "text-sm sm:text-base leading-relaxed",
-      "size_small": "text-xs sm:text-sm text-muted-foreground",
-      "size_label": "text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-    },
-    "rules": [
-      "NO INTER FOR MAIN HEADINGS. Rotate to Plus Jakarta Sans or Outfit.",
-      "Max hero heading size ceiling: text-5xl on desktop.",
-      "Maintain tight tracking (tracking-tight) on headings 24px and above.",
-      "Labels and tabular headers MUST be uppercase with letter spacing tracking-wider."
-    ]
-  },
-  "layout_and_grid": {
-    "density": "High Density Grid (Mode B for Dashboards & Finance Workspaces)",
-    "container_padding": "p-4 sm:p-6 lg:p-8",
-    "gap_spacing": "gap-4 sm:gap-6",
-    "sidebar": "Fixed desktop left sidebar (w-64) with collapsible mobile overlay nav",
-    "header": "Top glassmorphism bar (h-16 backdrop-blur-md bg-background/80 border-b border-border/50 sticky top-0 z-40)"
-  },
-  "key_features_and_flows": [
-    {
-      "id": "dashboard",
-      "title": "Dashboard Penjualan & Summary",
-      "description": "North Star metric hero (Total Omzet, Cashflow Net, Pending Piutang, Document Audit Pass Rate) with quick filters and interactive revenue/expense charts."
-    },
-    {
-      "id": "doc_upload_extraction",
-      "title": "Upload Dokumen & AI Extraction",
-      "description": "Drag-and-drop document vault (PDF/Image invoice, receipt, tax form). Live OCR/AI breakdown simulating line item extraction, confidence scores, and instant verification."
-    },
-    {
-      "id": "transaction_validation",
-      "title": "Validasi Transaksi",
-      "description": "Rule-based and AI anomaly detection for transaction records, flag duplicates, tax discrepancies, and mismatch alerts with one-click approval/rejection."
-    },
-    {
-      "id": "invoice_database",
-      "title": "Database Invoice",
-      "description": "Searchable, filterable ledger with status tags (Paid, Pending, Overdue, Disputed), bulk actions, export capabilities, and quick detail modal."
-    },
-    {
-      "id": "invoice_generator",
-      "title": "Invoice Generator Profesional",
-      "description": "Interactive live invoice designer with customized layout, tax calculation, client selection, itemized pricing, logo upload simulation, and PDF preview/download."
-    },
-    {
-      "id": "automatic_reports",
-      "title": "Laporan Otomatis",
-      "description": "Profit & Loss statement, Balance sheet summary, Tax estimation report (PPN/PPh), with automated AI summary notes and download capabilities."
-    },
-    {
-      "id": "customer_product_mgmt",
-      "title": "Manajemen Customer & Produk",
-      "description": "Dual tab interface for client directories with credit limits and product/service catalog with stock/pricing controls."
-    },
-    {
-      "id": "piutang_mgmt",
-      "title": "Manajemen Piutang (Accounts Receivable)",
-      "description": "Aging schedule breakdown (0-30 days, 31-60 days, 60+ days), automated payment reminder trigger, and risk score indicator."
-    },
-    {
-      "id": "ai_financial_assistant",
-      "title": "AI Financial Assistant",
-      "description": "Interactive AI Chatbot panel answering financial questions, forecasting revenue trends, drafting tax suggestions, and explaining ledger discrepancies in Indonesian."
+    "currency_and_numbers": {
+      "font_family": "font-mono font-semibold tracking-tight",
+      "locale_rules": "Format Indonesian Rupiah with prefix 'Rp ' and thousands separator '.', e.g. 'Rp 148.500.000'. Numbers right-aligned in all tables and data ledgers."
     }
-  ],
-  "image_urls": [
-    {
-      "category": "dashboard_analytics",
-      "url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxmaW5hbmNpYWwlMjBhbmFseXRpY3MlMjBkb2N1bWVudCUyMGRhc2hib2FyZCUyMGdyYXBofGVufDB8fHx8MTc5MTUyMTI3OHww&ixlib=rb-4.1.0&q=85",
-      "description": "Financial analytics performance chart"
-    },
-    {
-      "category": "data_monitoring",
-      "url": "https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxmaW5hbmNpYWwlMjBhbmFseXRpY3MlMjBkb2N1bWVudCUyMGRhc2hib2FyZCUyMGdyYXBofGVufDB8fHx8MTc5MTUyMTI3OHww&ixlib=rb-4.1.0&q=85",
-      "description": "Data analytics dashboard display"
-    },
-    {
-      "category": "market_trends",
-      "url": "https://images.unsplash.com/photo-1591696205602-2f950c417cb9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHozfHxmaW5hbmNpYWwlMjBhbmFseXRpY3MlMjBkb2N1bWVudCUyMGRhc2hib2FyZCUyMGdyYXBofGVufDB8fHx8MTc5MTUyMTI3OHww&ixlib=rb-4.1.0&q=85",
-      "description": "Financial trend and market graph"
-    }
-  ],
-  "testing_and_attributes": {
-    "required_data_testid_convention": "kebab-case functional identifiers on every interactive element and data card",
-    "examples": [
-      "data-testid=\"nav-dashboard-link\"",
-      "data-testid=\"doc-upload-zone\"",
-      "data-testid=\"ai-extract-button\"",
-      "data-testid=\"invoice-create-submit\"",
-      "data-testid=\"invoice-table-row-101\"",
-      "data-testid=\"piutang-aging-card\"",
-      "data-testid=\"ai-chat-input\"",
-      "data-testid=\"ai-chat-send-btn\"",
-      "data-testid=\"theme-toggle-button\""
-    ]
   },
-  "general_ui_ux_guidelines": [
-    "Ensure all interactive components (buttons, links, inputs, tabs, dropdowns) have explicit hover, active, and focus states.",
-    "Do NOT rely on transparent backgrounds for dropdowns, tooltips, or overlays — always set dark or light solid surface backgrounds with thin subtle borders.",
-    "File extension note: Project uses JavaScript (.js / .jsx) files. Write React code adhering to JSX specs.",
-    "Provide demo mock datasets in local JS state/constants for realistic Indonesian financial context (IDR currency, PPN 11%, PT standard corporate names).",
-    "Integrate 'sonner' toast notifications for instant feedback on document uploads, invoice status changes, and AI extraction completions."
-  ]
+  "entry_surfaces": {
+    "/": "ERP Light layout with persistent left navigation sidebar, sticky top utility header with search and theme/accent toolbar, and high-density KPI & data workspace.",
+    "/login": "Branded dual-panel business auth: company positioning and audit highlights on left, clean white authentication card with locale switcher on right."
+  },
+  "navigation_and_layout": {
+    "sidebar": {
+      "width_desktop": "w-64",
+      "collapsed_width": "w-18",
+      "style": "bg-sidebar border-r border-border text-sidebar-foreground h-screen sticky top-0 flex flex-col justify-between py-4 px-3 select-none",
+      "logo_block": "AuditPro AI (with ERP Business Shield mark and active PT / Entity badge)",
+      "menu_items": [
+        {"id": "overview", "label": "Overview & Ringkasan", "icon": "LayoutDashboard", "badge": null},
+        {"id": "ai-assistant", "label": "AI Assistant Keuangan", "icon": "Bot", "badge": "AI Pro"},
+        {"id": "dokumen", "label": "Dokumen & OCR Vault", "icon": "FileCheck", "badge": "OCR Live"},
+        {"id": "transaksi", "label": "Transaksi & Ledger", "icon": "ArrowLeftRight", "badge": null},
+        {"id": "invoice", "label": "Invoice Studio", "icon": "Receipt", "badge": null},
+        {"id": "laporan", "label": "Laporan Otomatis", "icon": "BarChart3", "badge": null},
+        {"id": "pajak", "label": "Pajak & e-Faktur", "icon": "ShieldCheck", "badge": "PPh/PPN"},
+        {"id": "customer-produk", "label": "Customer & Produk", "icon": "Building2", "badge": null},
+        {"id": "piutang", "label": "Piutang & Aging AR", "icon": "ClockAlert", "badge": "AR"}
+      ],
+      "footer_block": "Active Organization switcher (e.g. 'PT Nusantara Solusi Digital'), current user status, and quick theme customizer trigger."
+    },
+    "header": {
+      "height": "h-16",
+      "style": "sticky top-0 z-30 bg-card/90 backdrop-blur-md border-b border-border px-6 flex items-center justify-between gap-4",
+      "elements": [
+        "Mobile hamburger trigger (<Sheet> drawer)",
+        "Global search bar with shortcut badge (Ctrl + K) for instant invoice/ledger/document search",
+        "Quick fiscal period filter (e.g. 'Bulan Ini: Agustus 2026', 'Q3 2026', 'Tahun 2026')",
+        "Live AI Sync & OCR status indicator (Pulsing emerald dot: 'Sistem Sinkron')",
+        "Theme switcher popover (Light / Dark / Custom Accent Picker)",
+        "Notification bell with pending approval count badge",
+        "Company Profile & User avatar dropdown"
+      ]
+    },
+    "container_grid": {
+      "strategy": "mode_b_high_density",
+      "padding": "p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto",
+      "kpi_grid": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
+      "main_split": "grid grid-cols-1 lg:grid-cols-12 gap-6"
+    }
+  },
+  "modules_and_redesign_specs": {
+    "dashboard_overview": {
+      "kpi_cards": [
+        {"title": "Total Omzet (YTD)", "metric": "Rp 1.482.350.000", "delta": "+14.2% MoM", "status": "positive", "subtext": "vs target Rp 1.350.000.000"},
+        {"title": "Arus Kas Bersih (Net Cashflow)", "metric": "Rp 428.190.000", "delta": "+8.7% MoM", "status": "positive", "subtext": "Saldo Bank Operasional"},
+        {"title": "Piutang Jatuh Tempo (Overdue AR)", "metric": "Rp 84.500.000", "delta": "-5.3% MoM", "status": "warning", "subtext": "5 invoice perlu penagihan"},
+        {"title": "Approval Pass Rate", "metric": "98.4%", "delta": "+1.1%", "status": "neutral", "subtext": "128 dokumen terverifikasi AI"}
+      ],
+      "chart_section": "Dual-axis Revenue vs Expenses AreaChart (Recharts) with clean gradient fills, custom tooltip showing formatted IDR values, and period toggles (Bulanan, Kuartalan, Tahunan).",
+      "recent_invoices_ledger": "Clean bordered table with column alignment: No. Invoice (mono), Klien/PT, Tanggal, Nominal (mono right-aligned), Status Badge, Aksi (Aksi Cepat).",
+      "embedded_ai_briefing": "Executive AI summary card highlighting anomalies, tax optimization recommendations, and payment reminders."
+    },
+    "dokumen_ocr_vault": {
+      "style": "Structured tabular vault with OCR Confidence bar (0-100%), Document Type chip (Kwitansi, Faktur Pajak, PO, Invoice Vendor), Validation status, and quick validation drawer."
+    },
+    "invoice_studio": {
+      "style": "Side-by-side template editor with live paper preview (A4 format with Indonesian tax compliance notes, e-meterai zone, bank transfer details) + Export toolbar (PDF, Excel, e-Faktur XML draft)."
+    },
+    "laporan_dan_pajak": {
+      "style": "Financial Statement matrix (Laba Rugi, Neraca Ringkas, Rekonsiliasi PPN & PPh 23) with 1-click official export and audit logs."
+    },
+    "ai_assistant_workspace": {
+      "style": "Split chat view: Left conversation history and financial query templates (e.g., 'Analisis Margin Produk Q2', 'Cek Anomali Pengeluaran > Rp 10 Juta', 'Simulasi Pembayaran PPN'), Right streaming chat thread with structured financial cards."
+    }
+  },
+  "status_badge_matrix": {
+    "transaction_approval": {
+      "DRAFT": {"bg": "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200", "label": "Draft"},
+      "PENDING_REVIEW": {"bg": "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200", "label": "Menunggu Review"},
+      "APPROVED": {"bg": "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200", "label": "Disetujui"},
+      "REJECTED": {"bg": "bg-red-50 text-red-800 dark:bg-red-950/60 dark:text-red-300 border-red-200", "label": "Ditolak"}
+    },
+    "invoice_status": {
+      "DRAFT": {"bg": "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200", "label": "Konsep"},
+      "SENT": {"bg": "bg-blue-50 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300", "label": "Terkirim"},
+      "PAID": {"bg": "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300", "label": "Lunas"},
+      "OVERDUE": {"bg": "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300", "label": "Jatuh Tempo"}
+    }
+  },
+  "motion_and_interactions": {
+    "transitions": "transition-colors duration-150 ease-in-out, transition-shadow duration-150 ease-in-out",
+    "card_hover": "hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200",
+    "button_press": "active:scale-[0.98] transition-transform duration-100",
+    "toast_position": "bottom-right",
+    "respect_reduced_motion": "motion-reduce:transition-none motion-reduce:transform-none"
+  },
+  "accessibility": {
+    "wcag_compliance": "WCAG AA (minimum 4.5:1 text contrast on light/dark surfaces)",
+    "table_navigation": "Sticky headers, aria-sort on sortable columns, full keyboard focus rings with custom accent offset (focus-visible:ring-2 focus-visible:ring-offset-2)",
+    "data_testid_convention": "All actionable controls and key financial metrics MUST feature kebab-case data-testid tags (e.g. data-testid='kpi-omzet-value', data-testid='theme-toggle-button', data-testid='accent-color-picker', data-testid='btn-export-pdf')"
+  },
+  "instructions_to_main_agent": {
+    "step_1": "Update frontend/src/index.css with @import statements for '@fontsource-variable/manrope', '@fontsource-variable/plus-jakarta-sans', and '@fontsource-variable/jetbrains-mono'. Setup clean light-mode :root variables as primary default, .dark variables, and link primary accents to var(--brand-accent, #0284C7).",
+    "step_2": "Implement ThemeProvider context in frontend/src/lib/theme-provider.tsx supporting theme ('light' | 'dark') and brandAccent (hex string). Persist in localStorage under key 'auditpro_theme_config' and apply CSS variable --brand-accent to document.documentElement.",
+    "step_3": "Build ThemeSwitcher component in the top header with Light / Dark toggle and Accent Color swatch picker + custom hex input.",
+    "step_4": "Overhaul Layout shell (Sidebar + Header + Breadcrumb) into modern white/light-slate ERP aesthetic with crisp borders, collapsible navigation, and responsive mobile sheet drawer.",
+    "step_5": "Refactor all pages (Overview, Dokumen OCR, Transaksi Ledger, Invoice Studio, Laporan, Pajak, AI Assistant, Customer, Piutang) into high-clarity ERP tables and card widgets with Rupiah formatting (Rp X.XXX.XXX) and status badges without breaking existing state/logic.",
+    "step_6": "Ensure all inputs and buttons use customized shadcn components and verify responsive breakpoints across mobile (375px), tablet (768px), and desktop (1280px+)."
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": {
+    "anti_ai_slop": "Never use generic centering for ERP data grids. Use strict left alignment for descriptions and right alignment for monetary values. Avoid heavy dark gradients in light mode; use crisp 1px borders (#E2E8F0) and subtle elevation.",
+    "locale": "Indonesian B2B ERP format: Currency formatted as 'Rp 1.482.350.000', dates formatted as '18 Agu 2026' or 'DD/MM/YYYY'.",
+    "testing_readiness": "All buttons, inputs, tabs, and metric items MUST have data-testid attributes."
+  }
 }
