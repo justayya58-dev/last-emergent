@@ -125,7 +125,7 @@ class Invoice(BaseModel):
     currency: str = "IDR"
     template: Literal["modern", "classic", "minimal"] = "modern"
     notes: str = ""
-    status: Literal["paid", "pending", "sent", "overdue", "draft"]
+    status: Literal["paid", "pending", "sent", "overdue", "draft", "payment_processing"]
     sent_at: str | None = None
     paid_at: str | None = None
     items: list[InvoiceItem] = Field(default_factory=list)
