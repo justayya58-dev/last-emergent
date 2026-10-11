@@ -8,7 +8,8 @@ import uuid
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pymongo import DuplicateKeyError, ReturnDocument
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from lib.dates import today_iso
 from lib.db import db
